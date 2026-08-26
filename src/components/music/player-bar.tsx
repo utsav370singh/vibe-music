@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { usePlayerStore } from '@/stores/player-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Slider } from '@/components/ui/slider'
@@ -14,8 +14,6 @@ export function PlayerBar() {
     isPlaying,
     currentTime,
     volume,
-    queue,
-    currentIndex,
     likedTrackIds,
     togglePlay,
     next,
@@ -27,7 +25,9 @@ export function PlayerBar() {
 
   const { user } = useAuthStore()
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const progressRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragTime, setDragTime] = useState(0)
+  const progressContainerRef = useRef<HTMLDivElement>(null)
 
   // Create audio element
   useEffect(() => {
@@ -39,27 +39,23 @@ export function PlayerBar() {
     const audio = audioRef.current
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime)
+      if (!isDragging) {
+        setCurrentTime(audio.currentTime)
+      }
     }
 
     const handleEnded = () => {
       next()
     }
 
-    const handleLoadedMetadata = () => {
-      // Ready to play
-    }
-
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('ended', handleEnded)
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('ended', handleEnded)
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
-  }, [next, setCurrentTime])
+  }, [next, setCurrentTime, isDragging])
 
   // Handle track changes
   useEffect(() => {
@@ -72,7 +68,7 @@ export function PlayerBar() {
     if (isPlaying) {
       audio.play().catch(console.error)
     }
-  }, [currentTrack?.id])
+  }, [currentTrack?.id, isPlaying, volume])
 
   // Handle play/pause
   useEffect(() => {
@@ -93,13 +89,37 @@ export function PlayerBar() {
     }
   }, [volume])
 
-  const handleSeek = useCallback((value: number[]) => {
-    const time = value[0]
+  // Drag-to-seek helpers
+  const getTimeFromEvent = useCallback((e: React.MouseEvent | React.PointerEvent, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+    const pct = x / rect.width
+    return pct * (currentTrack?.duration || 30)
+  }, [currentTrack?.duration])
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (!progressContainerRef.current || !currentTrack) return
+    e.preventDefault()
+    const time = getTimeFromEvent(e, progressContainerRef.current)
+    setIsDragging(true)
+    setDragTime(time)
+    progressContainerRef.current.setPointerCapture(e.pointerId)
+  }, [currentTrack, getTimeFromEvent])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging || !progressContainerRef.current) return
+    const time = getTimeFromEvent(e, progressContainerRef.current)
+    setDragTime(time)
+  }, [isDragging, getTimeFromEvent])
+
+  const handlePointerUp = useCallback(() => {
+    if (!isDragging) return
     if (audioRef.current) {
-      audioRef.current.currentTime = time
+      audioRef.current.currentTime = dragTime
     }
-    setCurrentTime(time)
-  }, [setCurrentTime])
+    setCurrentTime(dragTime)
+    setIsDragging(false)
+  }, [isDragging, dragTime, setCurrentTime])
 
   const handleVolumeChange = useCallback((value: number[]) => {
     setVolume(value[0])
@@ -136,7 +156,6 @@ export function PlayerBar() {
         })
       }
     } catch (error) {
-      // Revert optimistic update
       toggleLike(currentTrack.id)
     }
   }, [user, currentTrack, likedTrackIds, toggleLike])
@@ -148,7 +167,8 @@ export function PlayerBar() {
   }
 
   const duration = currentTrack?.duration || 30
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+  const displayTime = isDragging ? dragTime : currentTime
+  const progress = duration > 0 ? (displayTime / duration) * 100 : 0
   const isLiked = currentTrack ? likedTrackIds.has(currentTrack.id) : false
 
   if (!currentTrack) {
@@ -173,21 +193,24 @@ export function PlayerBar() {
         className="fixed bottom-0 left-0 right-0 h-20 bg-card/95 backdrop-blur-xl border-t border-border z-50"
       >
         <div className="h-full flex flex-col justify-center px-4 gap-1">
-          {/* Progress bar */}
+          {/* Drag-to-seek progress bar */}
           <div
-            ref={progressRef}
-            className="absolute top-0 left-0 right-0 h-1 group cursor-pointer"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const pct = x / rect.width
-              handleSeek([pct * duration])
-            }}
+            ref={progressContainerRef}
+            className="absolute top-0 left-0 right-0 h-2 group cursor-pointer touch-none select-none z-10"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={() => { if (isDragging) handlePointerUp() }}
           >
-            <div className="h-full bg-secondary relative">
+            <div className="h-full bg-secondary/80 relative mx-0">
               <div
-                className="h-full bg-primary group-hover:bg-primary/80 transition-colors"
+                className="h-full bg-primary group-hover:bg-primary/80 transition-none"
                 style={{ width: `${progress}%` }}
+              />
+              {/* Drag handle */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                style={{ left: `calc(${progress}% - 6px)` }}
               />
             </div>
           </div>
@@ -198,11 +221,7 @@ export function PlayerBar() {
             <div className="flex items-center gap-3 min-w-0 w-1/3">
               <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
                 {currentTrack.coverUrl ? (
-                  <img
-                    src={currentTrack.coverUrl}
-                    alt={currentTrack.album}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={currentTrack.coverUrl} alt={currentTrack.album} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Music className="w-5 h-5 text-muted-foreground" />
@@ -248,7 +267,7 @@ export function PlayerBar() {
                 </Button>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(displayTime)}</span>
                 <span>/</span>
                 <span>{formatTime(duration)}</span>
               </div>

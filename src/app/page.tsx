@@ -1,24 +1,42 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthModal } from '@/components/music/auth-modal'
 import { PlayerBar } from '@/components/music/player-bar'
 import { SearchSection } from '@/components/music/search-section'
 import { LikedSongs } from '@/components/music/liked-songs'
+import { HomePage } from '@/components/music/home-page'
 import { useAuthStore } from '@/stores/auth-store'
+import { usePlayerStore } from '@/stores/player-store'
 import { Button } from '@/components/ui/button'
-import { Music, Heart, Home, LogOut, LogIn, Menu, X } from 'lucide-react'
+import { Music, Heart, Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/use-toast'
-
-type View = 'home' | 'liked'
+import { Input } from '@/components/ui/input'
 
 export default function MusicPage() {
   const { user, logout } = useAuthStore()
   const [authOpen, setAuthOpen] = useState(false)
-  const [view, setView] = useState<View>('home')
+  const [view, setView] = useState<'home' | 'search' | 'liked'>('home')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { setLikedTrackIds } = usePlayerStore()
   const { toast } = useToast()
+
+  // Load liked track IDs when user logs in
+  useEffect(() => {
+    if (!user) {
+      setLikedTrackIds([])
+      return
+    }
+    fetch('/api/likes', { headers: { 'x-user-id': user.id } })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setLikedTrackIds(data.map((s: any) => s.trackId))
+        }
+      })
+      .catch(() => {})
+  }, [user, setLikedTrackIds])
 
   const handleLogout = () => {
     logout()
@@ -44,27 +62,35 @@ export default function MusicPage() {
             <span className="font-bold">Vibe</span>
           </div>
         </div>
-        {user ? (
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={handleLogout}
+            size="icon"
+            className="h-8 w-8 cursor-pointer"
+            onClick={() => setView('search')}
           >
-            <LogOut className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Sign out</span>
+            <Search className="w-4 h-4" />
           </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={() => setAuthOpen(true)}
-          >
-            <LogIn className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Sign in</span>
-          </Button>
-        )}
+          {user ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => setAuthOpen(true)}
+            >
+              Sign In
+            </Button>
+          )}
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -87,7 +113,7 @@ export default function MusicPage() {
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="p-5 pt-6">
+          <div className="p-5 pt-6 hidden lg:block">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
                 <Music className="w-5 h-5 text-primary" />
@@ -99,6 +125,18 @@ export default function MusicPage() {
             </div>
           </div>
 
+          {/* Search in sidebar (desktop) */}
+          <div className="px-3 mb-2 hidden lg:block">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search songs, artists..."
+                className="pl-9 bg-secondary/50 border-border h-9 text-sm"
+                onFocus={() => setView('search')}
+              />
+            </div>
+          </div>
+
           <nav className="flex-1 px-3 space-y-1">
             <button
               onClick={() => { setView('home'); setSidebarOpen(false) }}
@@ -107,6 +145,15 @@ export default function MusicPage() {
               }`}
             >
               <Home className="w-4 h-4" />
+              Home
+            </button>
+            <button
+              onClick={() => { setView('search'); setSidebarOpen(false) }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                view === 'search' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              }`}
+            >
+              <Search className="w-4 h-4" />
               Search
             </button>
             <button
@@ -117,11 +164,6 @@ export default function MusicPage() {
             >
               <Heart className="w-4 h-4" />
               My Playlist
-              {user && (
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {user.username}
-                </span>
-              )}
             </button>
           </nav>
 
@@ -168,7 +210,8 @@ export default function MusicPage() {
               transition={{ duration: 0.15 }}
               className="p-4 md:p-6 lg:p-8 max-w-5xl"
             >
-              {view === 'home' && (
+              {view === 'home' && <HomePage />}
+              {view === 'search' && (
                 <div>
                   <div className="mb-6">
                     <h2 className="text-2xl md:text-3xl font-bold mb-1">Search</h2>
