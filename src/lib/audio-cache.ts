@@ -29,13 +29,13 @@ function evictOldest() {
   if (oldest) cache.delete(oldest)
 }
 
-// Clean expired entries periodically
-setInterval(() => {
+// Clean expired entries lazily on access instead of setInterval
+function cleanExpired() {
   const now = Date.now()
   for (const [key, val] of cache) {
     if (now - val.timestamp > MAX_CACHE_AGE) cache.delete(key)
   }
-}, 60_000)
+}
 
 export async function getAudio(url: string): Promise<Buffer> {
   const key = hashKey(url)
