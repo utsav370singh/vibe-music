@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const SAAVN_API = 'https://saavn-api-theta.vercel.app'
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -9,9 +11,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Artist ID is required' }, { status: 400 })
     }
 
-    const url = `https://itunes.apple.com/lookup?id=${artistId}&entity=song&limit=25`
+    const url = `${SAAVN_API}/artists/${artistId}/songs?page=0`
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
+      next: { revalidate: 300 },
     })
 
     if (!response.ok) {
@@ -19,10 +22,15 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json()
-    // First result is the artist, rest are tracks
-    const tracks = (data.results || []).filter((r: any) => r.wrapperType === 'track')
 
-    return NextResponse.json({ data: tracks, total: tracks.length })
+    if (data.status !== 'SUCCESS') {
+      return NextResponse.json({ error: 'Failed to fetch artist tracks', data: [] })
+    }
+
+    const results = data.data?.results || []
+    const total = data.data?.total || results.length
+
+    return NextResponse.json({ data: results, total })
   } catch (error) {
     console.error('Artist tracks error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
