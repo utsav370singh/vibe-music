@@ -1,18 +1,18 @@
 import { db } from '@/lib/db'
-import { verifyPassword } from '@/lib/crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password } = await req.json()
+    const { username } = await req.json()
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
+    if (!username || typeof username !== 'string') {
+      return NextResponse.json({ error: 'Username is required' }, { status: 400 })
     }
 
-    const user = await db.user.findUnique({ where: { username } })
-    if (!user || !verifyPassword(password, user.password)) {
-      return NextResponse.json({ error: 'Invalid username or password' }, { status: 401 })
+    const trimmed = username.trim().toLowerCase()
+    const user = await db.user.findUnique({ where: { username: trimmed } })
+    if (!user) {
+      return NextResponse.json({ error: 'Username not found. Please sign up first!' }, { status: 404 })
     }
 
     return NextResponse.json({

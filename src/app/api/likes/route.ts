@@ -3,13 +3,18 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) {
+    const username = req.headers.get('x-username')
+    if (!username) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
+    const user = await db.user.findUnique({ where: { username } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     const likedSongs = await db.likedSong.findMany({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -22,9 +27,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) {
+    const username = req.headers.get('x-username')
+    if (!username) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const user = await db.user.findUnique({ where: { username } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const { trackId, title, artist, album, coverUrl, previewUrl, duration } = await req.json()
@@ -35,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const likedSong = await db.likedSong.create({
       data: {
-        userId,
+        userId: user.id,
         trackId,
         title,
         artist: artist || 'Unknown',
@@ -58,9 +68,14 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id')
-    if (!userId) {
+    const username = req.headers.get('x-username')
+    if (!username) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const user = await db.user.findUnique({ where: { username } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const { searchParams } = new URL(req.url)
@@ -71,7 +86,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db.likedSong.deleteMany({
-      where: { userId, trackId },
+      where: { userId: user.id, trackId },
     })
 
     return NextResponse.json({ success: true })

@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, Heart, Music } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useToast } from '@/hooks/use-toast'
 
 interface TrackListProps {
   tracks: Track[]
@@ -51,8 +50,7 @@ export function getStreamUrl(saavnUrl: string): string {
 
 export function TrackList({ tracks, showIndex = false }: TrackListProps) {
   const { currentTrack, isPlaying, setQueue, togglePlay, likedTrackIds, toggleLike } = usePlayerStore()
-  const { user } = useAuthStore()
-  const { toast } = useToast()
+  const { user, requestAuth } = useAuthStore()
 
   const handlePlay = (track: Track) => {
     const isCurrentTrack = currentTrack?.id === track.id
@@ -73,7 +71,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
   const handleLike = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!user) {
-      toast({ title: 'Sign in required', description: 'Log in to like songs' })
+      requestAuth()
       return
     }
 
@@ -84,14 +82,14 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
       if (isLiked) {
         await fetch(`/api/likes?trackId=${encodeURIComponent(track.id)}`, {
           method: 'DELETE',
-          headers: { 'x-user-id': user.id },
+          headers: { 'x-username': user.username },
         })
       } else {
         await fetch('/api/likes', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': user.id,
+            'x-username': user.username,
           },
           body: JSON.stringify({
             trackId: track.id,

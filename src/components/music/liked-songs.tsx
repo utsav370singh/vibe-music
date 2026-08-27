@@ -8,7 +8,7 @@ import { Heart, Loader2, LogIn } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function LikedSongs() {
-  const { user } = useAuthStore()
+  const { user, requestAuth } = useAuthStore()
   const { setQueue, likedTrackIds, setLikedTrackIds } = usePlayerStore()
   const [songs, setSongs] = useState<Track[]>([])
   const [loading, setLoading] = useState(false)
@@ -18,19 +18,19 @@ export function LikedSongs() {
     setLoading(true)
     try {
       const res = await fetch('/api/likes', {
-        headers: { 'x-user-id': user.id },
+        headers: { 'x-username': user.username },
       })
       const data = await res.json()
-      setSongs(data.map((s: any) => ({
-        id: s.trackId,
-        title: s.title,
-        artist: s.artist,
-        album: s.album,
-        coverUrl: s.coverUrl,
-        previewUrl: s.previewUrl,
-        duration: s.duration,
+      setSongs(data.map((s: Record<string, unknown>) => ({
+        id: String(s.trackId),
+        title: String(s.title),
+        artist: String(s.artist),
+        album: String(s.album),
+        coverUrl: String(s.coverUrl || ''),
+        previewUrl: String(s.previewUrl),
+        duration: Number(s.duration) || 0,
       })))
-      setLikedTrackIds(data.map((s: any) => s.trackId))
+      setLikedTrackIds(data.map((s: Record<string, unknown>) => String(s.trackId)))
     } catch (error) {
       console.error('Failed to fetch liked songs:', error)
     } finally {
@@ -46,8 +46,15 @@ export function LikedSongs() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
         <LogIn className="w-16 h-16 mb-4 opacity-15" />
-        <h3 className="text-lg font-medium mb-1 text-foreground/60">Sign in to see your playlist</h3>
-        <p className="text-sm">Your liked songs will appear here</p>
+        <h3 className="text-lg font-medium mb-2 text-foreground/60">Sign in to see your playlist</h3>
+        <p className="text-sm text-muted-foreground mb-4">Your liked songs will appear here</p>
+        <Button
+          className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+          onClick={requestAuth}
+        >
+          <LogIn className="w-4 h-4 mr-2" />
+          Sign In
+        </Button>
       </div>
     )
   }

@@ -68,3 +68,28 @@ Stage Summary:
 - Stream proxy: first play ~2s delay, subsequent plays instant (cached)
 - Home page shows 6 Indian music categories
 - User accounts, liked songs, search, playback all working
+---
+Task ID: 3
+Agent: Main Orchestrator
+Task: Implement username-only authentication system with auth popup on like
+
+Work Log:
+- Updated Prisma schema: removed `password` field from User model, kept username as unique
+- Reset database with new schema
+- Rewrote `/api/auth/register` - username-only with validation (3-20 chars, lowercase, alphanumeric+underscore)
+- Rewrote `/api/auth/login` - username-only, returns 404 if user not found
+- Rewrote `/api/likes` - changed from `x-user-id` header to `x-username` header for all GET/POST/DELETE
+- Rewrote auth-store: removed password params, added `requestAuth()` and `clearAuthRequest()` for popup trigger
+- Rewrote AuthModal: no password fields, self-managed via store `authRequested` state, clean @-sign icon
+- Updated TrackList: like button calls `requestAuth()` instead of toast when user not logged in
+- Updated PlayerBar: like button calls `requestAuth()` instead of being disabled when user not logged in
+- Updated LikedSongs: uses `x-username` header, added Sign In button with `requestAuth()`
+- Updated page.tsx: AuthModal is self-managed (no props needed), all Sign In buttons use `requestAuth()`
+- Removed unused `crypto.ts` module
+- Verified all APIs via curl: register, duplicate check, login, not-found, like, get likes, unlike
+
+Stage Summary:
+- Username-only auth (no passwords) with unique username enforcement
+- Clicking like when not logged in opens auth modal popup automatically
+- Liked songs are per-user and saved to SQLite via username
+- Auth state persists across refreshes via Zustand persist

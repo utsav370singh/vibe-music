@@ -9,10 +9,13 @@ interface User {
 interface AuthState {
   user: User | null
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
-  register: (username: string, password: string) => Promise<void>
+  authRequested: boolean // flag to open the auth modal
+
+  login: (username: string) => Promise<void>
+  register: (username: string) => Promise<void>
   logout: () => void
-  checkAuth: () => void
+  requestAuth: () => void
+  clearAuthRequest: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -20,35 +23,36 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isLoading: false,
+      authRequested: false,
 
-      login: async (username: string, password: string) => {
+      login: async (username: string) => {
         set({ isLoading: true })
         try {
           const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username }),
           })
           const data = await res.json()
           if (!res.ok) throw new Error(data.error)
-          set({ user: data, isLoading: false })
+          set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
           set({ isLoading: false })
           throw error
         }
       },
 
-      register: async (username: string, password: string) => {
+      register: async (username: string) => {
         set({ isLoading: true })
         try {
           const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username }),
           })
           const data = await res.json()
           if (!res.ok) throw new Error(data.error)
-          set({ user: data, isLoading: false })
+          set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
           set({ isLoading: false })
           throw error
@@ -59,10 +63,8 @@ export const useAuthStore = create<AuthState>()(
         set({ user: null })
       },
 
-      checkAuth: () => {
-        // Auth state is persisted, so this is a no-op
-        // but could be used to validate session with server
-      },
+      requestAuth: () => set({ authRequested: true }),
+      clearAuthRequest: () => set({ authRequested: false }),
     }),
     {
       name: 'music-auth',

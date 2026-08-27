@@ -15,8 +15,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 
 export default function MusicPage() {
-  const { user, logout } = useAuthStore()
-  const [authOpen, setAuthOpen] = useState(false)
+  const { user, logout, requestAuth } = useAuthStore()
   const [view, setView] = useState<'home' | 'search' | 'liked'>('home')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { setLikedTrackIds } = usePlayerStore()
@@ -28,11 +27,11 @@ export default function MusicPage() {
       setLikedTrackIds([])
       return
     }
-    fetch('/api/likes', { headers: { 'x-user-id': user.id } })
+    fetch('/api/likes', { headers: { 'x-username': user.username } })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
-          setLikedTrackIds(data.map((s: any) => s.trackId))
+          setLikedTrackIds(data.map((s: Record<string, unknown>) => String(s.trackId)))
         }
       })
       .catch(() => {})
@@ -85,7 +84,7 @@ export default function MusicPage() {
               variant="ghost"
               size="sm"
               className="h-8 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={() => setAuthOpen(true)}
+              onClick={requestAuth}
             >
               Sign In
             </Button>
@@ -190,7 +189,7 @@ export default function MusicPage() {
               <Button
                 variant="secondary"
                 className="w-full cursor-pointer"
-                onClick={() => { setAuthOpen(true); setSidebarOpen(false) }}
+                onClick={() => { requestAuth(); setSidebarOpen(false) }}
               >
                 <LogIn className="w-4 h-4 mr-2" />
                 Sign In
@@ -229,8 +228,8 @@ export default function MusicPage() {
       {/* Player bar */}
       <PlayerBar />
 
-      {/* Auth modal */}
-      <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
+      {/* Auth modal (self-managed via store) */}
+      <AuthModal />
     </div>
   )
 }

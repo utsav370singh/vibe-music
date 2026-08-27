@@ -6,143 +6,147 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToast } from '@/hooks/use-toast'
-import { Music } from 'lucide-react'
+import { Music, UserPlus, LogIn, AtSign } from 'lucide-react'
 
-interface AuthModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
-
-export function AuthModal({ open, onOpenChange }: AuthModalProps) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+export function AuthModal() {
+  const [mode, setMode] = useState<'login' | 'register'>('register')
   const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
-  const { login, register, isLoading } = useAuthStore()
+  const { login, register, isLoading, authRequested, clearAuthRequest, user } = useAuthStore()
   const { toast } = useToast()
 
-  const resetForm = () => {
-    setUsername('')
-    setPassword('')
-    setConfirmPassword('')
-    setError('')
-  }
+  // Open modal when authRequested is true, or when manually opened
+  const open = authRequested || false
 
-  const switchMode = (newMode: 'login' | 'register') => {
-    setMode(newMode)
-    resetForm()
+  // Reset form when modal opens/closes is handled in handleOpenChange and switchMode
+
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      setUsername('')
+      setError('')
+      clearAuthRequest()
+      return
+    }
+    // When opening, reset form if user just logged in
+    if (user) {
+      setUsername('')
+      setError('')
+      clearAuthRequest()
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (mode === 'register' && password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
     try {
       if (mode === 'login') {
-        await login(username, password)
+        await login(username)
         toast({ title: 'Welcome back!', description: `Logged in as ${username}` })
       } else {
-        await register(username, password)
+        await register(username)
         toast({ title: 'Account created!', description: `Welcome, ${username}! Your playlist is ready.` })
       }
-      onOpenChange(false)
-      resetForm()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     }
   }
 
+  const switchMode = (newMode: 'login' | 'register') => {
+    setMode(newMode)
+    setUsername('')
+    setError('')
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v) }}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-sm bg-card border-border">
         <DialogHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-              <Music className="w-6 h-6 text-primary" />
+          <div className="flex justify-center mb-3">
+            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+              <Music className="w-7 h-7 text-primary" />
             </div>
           </div>
           <DialogTitle className="text-xl">
-            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+            {mode === 'login' ? 'Welcome Back' : 'Join Vibe'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'login'
-              ? 'Sign in to access your playlist'
-              : 'Create a unique username to get started'}
+              ? 'Enter your username to continue'
+              : 'Pick a unique username to get started'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-2">
+          <div className="relative">
+            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Username"
+              placeholder={mode === 'login' ? 'Enter your username' : 'Choose a username'}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
               required
               minLength={3}
-              className="bg-secondary border-border"
+              maxLength={20}
+              className="pl-10 bg-secondary border-border h-11"
               autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={4}
-              className="bg-secondary border-border"
+              disabled={isLoading}
             />
           </div>
 
           {mode === 'register' && (
-            <div className="space-y-2">
-              <Input
-                type="password"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={4}
-                className="bg-secondary border-border"
-              />
-            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              Only letters, numbers, and underscores. 3-20 characters.
+            </p>
           )}
 
           {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
+            <p className="text-sm text-destructive text-center bg-destructive/10 py-2 px-3 rounded-lg">{error}</p>
           )}
 
           <Button
             type="submit"
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-            disabled={isLoading}
+            className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer font-medium"
+            disabled={isLoading || username.length < 3}
           >
-            {isLoading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                Please wait...
+              </span>
+            ) : mode === 'login' ? (
+              <span className="flex items-center gap-2">
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Create Account
+              </span>
+            )}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            {mode === 'login' ? (              <>Don&apos;t have an account?{' '}
+            {mode === 'login' ? (
+              <>
+                Don&apos;t have an account?{' '}
                 <button
                   type="button"
                   onClick={() => switchMode('register')}
-                  className="text-primary hover:underline cursor-pointer"
-                >                  Sign up
+                  className="text-primary hover:underline cursor-pointer font-medium"
+                >
+                  Sign up
                 </button>
               </>
             ) : (
-              <>Already have an account?{' '}
+              <>
+                Already have an account?{' '}
                 <button
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="text-primary hover:underline cursor-pointer"
-                >                  Sign in
+                  className="text-primary hover:underline cursor-pointer font-medium"
+                >
+                  Sign in
                 </button>
               </>
             )}

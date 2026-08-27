@@ -24,7 +24,7 @@ export function PlayerBar() {
     toggleLike,
   } = usePlayerStore()
 
-  const { user } = useAuthStore()
+  const { user, requestAuth } = useAuthStore()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
@@ -152,7 +152,11 @@ export function PlayerBar() {
   }, [setVolume])
 
   const handleLike = useCallback(async () => {
-    if (!user || !currentTrack) return
+    if (!currentTrack) return
+    if (!user) {
+      requestAuth()
+      return
+    }
 
     const isLiked = likedTrackIds.has(currentTrack.id)
     toggleLike(currentTrack.id)
@@ -161,14 +165,14 @@ export function PlayerBar() {
       if (isLiked) {
         await fetch(`/api/likes?trackId=${encodeURIComponent(currentTrack.id)}`, {
           method: 'DELETE',
-          headers: { 'x-user-id': user.id },
+          headers: { 'x-username': user.username },
         })
       } else {
         await fetch('/api/likes', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': user.id,
+            'x-username': user.username,
           },
           body: JSON.stringify({
             trackId: currentTrack.id,
@@ -181,10 +185,10 @@ export function PlayerBar() {
           }),
         })
       }
-    } catch (error) {
+    } catch {
       toggleLike(currentTrack.id)
     }
-  }, [user, currentTrack, likedTrackIds, toggleLike])
+  }, [user, currentTrack, likedTrackIds, toggleLike, requestAuth])
 
   const formatTime = (seconds: number) => {
     if (!seconds || seconds <= 0) return '0:00'
@@ -310,7 +314,6 @@ export function PlayerBar() {
                 size="icon"
                 className={`h-8 w-8 cursor-pointer ${isLiked ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                 onClick={handleLike}
-                disabled={!user}
               >
                 <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
               </Button>
