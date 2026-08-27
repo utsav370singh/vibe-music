@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export interface Track {
-  id: number
+  id: string
   title: string
   artist: string
   album: string
@@ -24,7 +24,7 @@ interface PlayerState {
   currentTrack: Track | null
 
   // Liked track IDs (optimistic)
-  likedTrackIds: Set<number>
+  likedTrackIds: Set<string>
 
   // Actions
   setQueue: (tracks: Track[], startIndex?: number) => void
@@ -37,8 +37,8 @@ interface PlayerState {
   previous: () => void
   setCurrentTime: (time: number) => void
   setVolume: (volume: number) => void
-  toggleLike: (trackId: number) => void
-  setLikedTrackIds: (ids: number[]) => void
+  toggleLike: (trackId: string) => void
+  setLikedTrackIds: (ids: string[]) => void
   clearQueue: () => void
 }
 
@@ -49,7 +49,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   currentTime: 0,
   volume: 0.8,
   currentTrack: null,
-  likedTrackIds: new Set<number>(),
+  likedTrackIds: new Set<string>(),
 
   setQueue: (tracks, startIndex = 0) => {
     const track = tracks[startIndex]
@@ -126,7 +126,6 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   previous: () => {
     const { queue, currentIndex, currentTime } = get()
     if (queue.length === 0) return
-    // If more than 3 seconds in, restart current track
     if (currentTime > 3) {
       set({ currentTime: 0 })
       return

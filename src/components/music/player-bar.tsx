@@ -5,8 +5,9 @@ import { usePlayerStore } from '@/stores/player-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
-import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music } from 'lucide-react'
+import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getStreamUrl } from './track-list'
 
 export function PlayerBar() {
   const {
@@ -27,9 +28,11 @@ export function PlayerBar() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
+  const [buffering, setBuffering] = useState(false)
   const progressContainerRef = useRef<HTMLDivElement>(null)
+  const previousTrackIdRef = useRef<string | null>(null)
 
-  // Create audio element
+  // Create audio element once
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
@@ -48,39 +51,61 @@ export function PlayerBar() {
       next()
     }
 
+    const handleWaiting = () => setBuffering(true)
+    const handlePlaying = () => setBuffering(false)
+    const handleCanPlay = () => setBuffering(false)
+
     audio.addEventListener('timeupdate', handleTimeUpdate)
     audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('waiting', handleWaiting)
+    audio.addEventListener('playing', handlePlaying)
+    audio.addEventListener('canplay', handleCanPlay)
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('waiting', handleWaiting)
+      audio.removeEventListener('playing', handlePlaying)
+      audio.removeEventListener('canplay', handleCanPlay)
     }
   }, [next, setCurrentTime, isDragging])
 
-  // Handle track changes
+  // Load a new track when it changes
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !currentTrack) return
 
-    audio.src = currentTrack.previewUrl
+    // Only reload if the track actually changed
+    if (previousTrackIdRef.current === currentTrack.id) return
+    previousTrackIdRef.current = currentTrack.id
+
+    // Build the stream proxy URL from the Saavn download URL
+    const streamUrl = getStreamUrl(currentTrack.previewUrl)
+    if (!streamUrl) return
+
+    audio.src = streamUrl
     audio.volume = volume
+    audio.load()
 
     if (isPlaying) {
-      audio.play().catch(console.error)
+      audio.play().catch((err) => {
+        console.error('Play failed:', err)
+      })
     }
   }, [currentTrack?.id, isPlaying, volume])
 
-  // Handle play/pause
+  // Handle play/pause changes for the SAME track
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !currentTrack) return
+    if (previousTrackIdRef.current !== currentTrack.id) return
 
     if (isPlaying) {
       audio.play().catch(console.error)
     } else {
       audio.pause()
     }
-  }, [isPlaying, currentTrack])
+  }, [isPlaying])
 
   // Handle volume
   useEffect(() => {
@@ -114,10 +139,11 @@ export function PlayerBar() {
 
   const handlePointerUp = useCallback(() => {
     if (!isDragging) return
-    if (audioRef.current) {
-      audioRef.current.currentTime = dragTime
+    const audio = audioRef.current
+    if (audio && audio.readyState >= 1) {
+      audio.currentTime = dragTime
+      setCurrentTime(dragTime)
     }
-    setCurrentTime(dragTime)
     setIsDragging(false)
   }, [isDragging, dragTime, setCurrentTime])
 
@@ -133,7 +159,7 @@ export function PlayerBar() {
 
     try {
       if (isLiked) {
-        await fetch(`/api/likes?trackId=${currentTrack.id}`, {
+        await fetch(`/api/likes?trackId=${encodeURIComponent(currentTrack.id)}`, {
           method: 'DELETE',
           headers: { 'x-user-id': user.id },
         })
@@ -161,14 +187,15 @@ export function PlayerBar() {
   }, [user, currentTrack, likedTrackIds, toggleLike])
 
   const formatTime = (seconds: number) => {
+    if (!seconds || seconds <= 0) return '0:00'
     const m = Math.floor(seconds / 60)
     const s = Math.floor(seconds % 60)
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  const duration = currentTrack?.duration || 30
+  const duration = currentTrack?.duration || 0
   const displayTime = isDragging ? dragTime : currentTime
-  const progress = duration > 0 ? (displayTime / duration) * 100 : 0
+  const progress = duration > 0 ? Math.min((displayTime / duration) * 100, 100) : 0
   const isLiked = currentTrack ? likedTrackIds.has(currentTrack.id) : false
 
   if (!currentTrack) {
@@ -193,7 +220,7 @@ export function PlayerBar() {
         className="fixed bottom-0 left-0 right-0 h-20 bg-card/95 backdrop-blur-xl border-t border-border z-50"
       >
         <div className="h-full flex flex-col justify-center px-4 gap-1">
-          {/* Drag-to-seek progress bar */}
+          {/* Draggable seek bar */}
           <div
             ref={progressContainerRef}
             className="absolute top-0 left-0 right-0 h-2 group cursor-pointer touch-none select-none z-10"
@@ -229,7 +256,10 @@ export function PlayerBar() {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{currentTrack.title}</p>
+                <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                  {buffering && <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />}
+                  {currentTrack.title}
+                </p>
                 <p className="text-xs text-muted-foreground truncate">{currentTrack.artist}</p>
               </div>
             </div>

@@ -2,38 +2,56 @@
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
-import { TrackList, parseITunesTrack } from './track-list'
+import { TrackList, parseSaavnTrack } from './track-list'
 import { ChevronLeft, Disc3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import type { Track } from '@/stores/player-store'
 
-interface AlbumResult {
-  collectionId: number
-  collectionName: string
-  artworkUrl100: string
-  artistName: string
-  trackCount: number
-  releaseDate: string
+interface SaavnAlbum {
+  id: string
+  name: string
+  year?: string
+  songCount?: string
+  language?: string
+  image?: { quality: string; link: string }[]
+  primaryArtists?: { id: string; name: string; image?: boolean | { quality: string; link: string }[] }[]
+  artists?: { id: string; name: string; image?: boolean | { quality: string; link: string }[] }[]
 }
 
 interface AlbumGridProps {
-  albums: AlbumResult[]
+  albums: SaavnAlbum[]
+}
+
+function getAlbumCover(album: SaavnAlbum): string {
+  const images = album.image || []
+  const img = images.find(i => i.quality === '500x500') || images[images.length - 1]
+  return img?.link || ''
+}
+
+function getAlbumArtist(album: SaavnAlbum): string {
+  if (album.primaryArtists?.length) {
+    return album.primaryArtists.map(a => a.name).join(', ')
+  }
+  if (album.artists?.length) {
+    return album.artists.map(a => a.name).join(', ')
+  }
+  return 'Various Artists'
 }
 
 export function AlbumGrid({ albums }: AlbumGridProps) {
-  const [selectedAlbum, setSelectedAlbum] = useState<AlbumResult | null>(null)
+  const [selectedAlbum, setSelectedAlbum] = useState<SaavnAlbum | null>(null)
   const [albumTracks, setAlbumTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(false)
 
-  const handleSelectAlbum = async (album: AlbumResult) => {
+  const handleSelectAlbum = async (album: SaavnAlbum) => {
     setSelectedAlbum(album)
     setLoading(true)
     try {
-      const res = await fetch(`/api/search/album-tracks?id=${album.collectionId}`)
+      const res = await fetch(`/api/search/album-tracks?id=${album.id}&name=${encodeURIComponent(album.name)}`)
       const data = await res.json()
       if (data.data) {
-        setAlbumTracks(data.data.map(parseITunesTrack))
+        setAlbumTracks(data.data.map(parseSaavnTrack))
       }
     } catch (error) {
       console.error('Failed to fetch album tracks:', error)
@@ -42,11 +60,8 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
     }
   }
 
-  const getCoverUrl = (url: string) => {
-    return url.replace(/\d+x\d+bb/, '300x300bb')
-  }
-
   if (selectedAlbum) {
+    const coverUrl = getAlbumCover(selectedAlbum)
     return (
       <div>
         <Button
@@ -61,8 +76,8 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
 
         <div className="flex items-center gap-4 mb-6">
           <div className="w-24 h-24 rounded-lg overflow-hidden bg-secondary flex-shrink-0 shadow-xl">
-            {selectedAlbum.artworkUrl100 ? (
-              <img src={getCoverUrl(selectedAlbum.artworkUrl100)} alt={selectedAlbum.collectionName} className="w-full h-full object-cover" />
+            {coverUrl ? (
+              <img src={coverUrl} alt={selectedAlbum.name} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Disc3 className="w-10 h-10 text-muted-foreground" />
@@ -71,8 +86,12 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
           </div>
           <div>
             <p className="text-sm text-muted-foreground mb-1">Album</p>
-            <h2 className="text-2xl font-bold">{selectedAlbum.collectionName}</h2>
-            <p className="text-sm text-muted-foreground">{selectedAlbum.artistName} &middot; {selectedAlbum.trackCount} tracks</p>
+            <h2 className="text-2xl font-bold">{selectedAlbum.name}</h2>
+            <p className="text-sm text-muted-foreground">
+              {getAlbumArtist(selectedAlbum)}
+              {selectedAlbum.songCount ? ` · ${selectedAlbum.songCount} tracks` : ''}
+              {selectedAlbum.year ? ` · ${selectedAlbum.year}` : ''}
+            </p>
           </div>
         </div>
 
@@ -98,35 +117,38 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      {albums.map((album, index) => (
-        <motion.div
-          key={album.collectionId}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: index * 0.03, duration: 0.2 }}
-        >
-          <Card
-            className="bg-secondary/50 hover:bg-accent border-transparent cursor-pointer transition-all p-3 group"
-            onClick={() => handleSelectAlbum(album)}
+      {albums.map((album, index) => {
+        const coverUrl = getAlbumCover(album)
+        return (
+          <motion.div
+            key={album.id}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.03, duration: 0.2 }}
           >
-            <div className="aspect-square rounded-md overflow-hidden bg-muted mb-3">
-              {album.artworkUrl100 ? (
-                <img
-                  src={getCoverUrl(album.artworkUrl100)}
-                  alt={album.collectionName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Disc3 className="w-12 h-12 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-            <p className="text-sm font-medium truncate">{album.collectionName}</p>
-            <p className="text-xs text-muted-foreground truncate">{album.artistName}</p>
-          </Card>
-        </motion.div>
-      ))}
+            <Card
+              className="bg-secondary/50 hover:bg-accent border-transparent cursor-pointer transition-all p-3 group"
+              onClick={() => handleSelectAlbum(album)}
+            >
+              <div className="aspect-square rounded-md overflow-hidden bg-muted mb-3">
+                {coverUrl ? (
+                  <img
+                    src={coverUrl}
+                    alt={album.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Disc3 className="w-12 h-12 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <p className="text-sm font-medium truncate">{album.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{getAlbumArtist(album)}</p>
+            </Card>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }

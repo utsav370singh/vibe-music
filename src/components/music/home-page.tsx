@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { usePlayerStore, type Track } from '@/stores/player-store'
-import { TrackList, parseITunesTrack } from './track-list'
+import { TrackList, parseSaavnTrack, getStreamUrl } from './track-list'
 import { Button } from '@/components/ui/button'
 import { Play, ChevronRight, Loader2, TrendingUp } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -12,7 +12,6 @@ interface Playlist {
   name: string
   description: string
   emoji: string
-  bg: string
 }
 
 function HeroSection({ tracks, onPlayAll }: { tracks: Track[]; onPlayAll: (tracks: Track[]) => void }) {
@@ -52,9 +51,9 @@ function HeroSection({ tracks, onPlayAll }: { tracks: Track[]; onPlayAll: (track
             <TrendingUp className="w-4 h-4 text-primary" />
             <span className="text-xs font-medium text-primary uppercase tracking-wider">Trending Now</span>
           </div>
-          <h2 className="text-2xl md:text-4xl font-bold mb-2">Discover Music</h2>
+          <h2 className="text-2xl md:text-4xl font-bold mb-2">Discover Indian Music</h2>
           <p className="text-muted-foreground text-sm md:text-base max-w-md">
-            Search for any song, artist, or album. Like your favorites to build your personal playlist.
+            Search for Bollywood, Punjabi, Tamil, and all your favorite Indian music. Full songs, ad-free.
           </p>
         </div>
 
@@ -126,7 +125,7 @@ function TrackCard({ track }: { track: Track }) {
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => playTrack(track)}
-      className={`bg-gradient-to-br ${'from-primary/10 to-secondary'} hover:from-primary/20 hover:to-accent rounded-xl p-3 text-left transition-all cursor-pointer group border border-transparent hover:border-border/50`}
+      className={`bg-gradient-to-br from-primary/10 to-secondary hover:from-primary/20 hover:to-accent rounded-xl p-3 text-left transition-all cursor-pointer group border border-transparent hover:border-border/50`}
     >
       <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2.5 relative">
         {track.coverUrl ? (
@@ -161,10 +160,10 @@ export function HomePage() {
 
       if (data.playlists) setPlaylists(data.playlists)
 
-      // Parse all track arrays
+      // Parse all track arrays using Saavn parser
       const parsed: Record<string, Track[]> = {}
       for (const [key, rawTracks] of Object.entries(data.tracks || {})) {
-        parsed[key] = (rawTracks as any[]).map(parseITunesTrack).filter((t) => t.previewUrl)
+        parsed[key] = (rawTracks as Record<string, unknown>[]).map(parseSaavnTrack).filter((t) => t.previewUrl)
       }
       setTrackMap(parsed)
     } catch (error) {

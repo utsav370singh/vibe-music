@@ -12,19 +12,41 @@ interface TrackListProps {
   showIndex?: boolean
 }
 
-export function parseITunesTrack(raw: Record<string, unknown>): Track {
-  const artworkUrl = String(raw.artworkUrl100 || '')
-  // Get higher quality artwork
-  const coverUrl = artworkUrl.replace(/\d+x\d+bb/, '300x300bb')
+// Parse a raw JioSaavn API song object into our Track format
+export function parseSaavnTrack(raw: Record<string, unknown>): Track {
+  const images = (raw.image as { quality: string; link: string }[]) || []
+  const cover = images.find(i => i.quality === '500x500') || images[images.length - 1]
+
+  const downloads = (raw.downloadUrl as { quality: string; link: string }[]) || []
+  const dl320 = downloads.find(d => d.quality === '320kbps') || downloads[downloads.length - 1]
+
+  // Decode HTML entities in song name
+  const name = String(raw.name || 'Unknown')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+
+  const albumObj = raw.album as { name?: string } | undefined
+
   return {
-    id: Number(raw.trackId || raw.collectionId || 0),
-    title: String(raw.trackName || raw.collectionName || 'Unknown'),
-    artist: String(raw.artistName || 'Unknown'),
-    album: String(raw.collectionName || 'Unknown'),
-    coverUrl,
-    previewUrl: String(raw.previewUrl || ''),
-    duration: Math.round(Number(raw.trackTimeMillis || 30000) / 1000),
+    id: String(raw.id || ''),
+    title: name,
+    artist: String(raw.primaryArtists || 'Unknown'),
+    album: albumObj?.name || 'Unknown',
+    coverUrl: cover?.link || '',
+    previewUrl: dl320?.link || '',
+    duration: parseInt(String(raw.duration || '0')) || 0,
   }
+}
+
+// Build the proxy stream URL from a Saavn download URL
+export function getStreamUrl(saavnUrl: string): string {
+  if (!saavnUrl) return ''
+  // Use btoa (browser-native) + base64url encoding
+  const encoded = btoa(saavnUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return `/api/stream?url=${encoded}`
 }
 
 export function TrackList({ tracks, showIndex = false }: TrackListProps) {
@@ -60,7 +82,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
 
     try {
       if (isLiked) {
-        await fetch(`/api/likes?trackId=${track.id}`, {
+        await fetch(`/api/likes?trackId=${encodeURIComponent(track.id)}`, {
           method: 'DELETE',
           headers: { 'x-user-id': user.id },
         })
@@ -88,6 +110,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
   }
 
   const formatDuration = (sec: number) => {
+    if (!sec || sec <= 0) return '0:00'
     const m = Math.floor(sec / 60)
     const s = sec % 60
     return `${m}:${s.toString().padStart(2, '0')}`

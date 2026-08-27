@@ -3,11 +3,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { TrackList, parseITunesTrack } from './track-list'
+import { TrackList, parseSaavnTrack } from './track-list'
 import { ArtistGrid } from './artist-grid'
 import { AlbumGrid } from './album-grid'
 import { Search, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import type { Track } from '@/stores/player-store'
 
 export function SearchSection() {
   const [query, setQuery] = useState('')
@@ -33,7 +34,7 @@ export function SearchSection() {
       const data = await res.json()
 
       if (searchType === 'track') {
-        setTracks((data.data || []).map(parseITunesTrack))
+        setTracks((data.data || []).map(parseSaavnTrack))
       } else if (searchType === 'artist') {
         setArtists(data.data || [])
       } else if (searchType === 'album') {
@@ -118,15 +119,15 @@ export function SearchSection() {
           type === 'track' ? (
             <TrackList tracks={tracks} showIndex />
           ) : type === 'artist' ? (
-            <ArtistGrid artists={artists as any} />
+            <ArtistGrid artists={artists} />
           ) : (
-            <AlbumGrid albums={albums as any} />
+            <AlbumGrid albums={albums} />
           )
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Search className="w-16 h-16 mb-4 opacity-15" />
             <h3 className="text-lg font-medium mb-1 text-foreground/60">Search for music</h3>
-            <p className="text-sm">Find your favorite songs, artists, and albums</p>
+            <p className="text-sm">Find your favorite Bollywood, Punjabi, and Indian songs</p>
           </div>
         )}
       </div>

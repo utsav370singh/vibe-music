@@ -64,7 +64,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
-    const trackId = parseInt(searchParams.get('trackId') || '0')
+    const trackId = searchParams.get('trackId')
 
     if (!trackId) {
       return NextResponse.json({ error: 'Track ID is required' }, { status: 400 })

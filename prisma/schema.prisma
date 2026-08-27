@@ -19,7 +19,7 @@ model User {
 model LikedSong {
   id         String   @id @default(cuid())
   userId     String
-  trackId    Int
+  trackId    String
   title      String
   artist     String
   album      String
