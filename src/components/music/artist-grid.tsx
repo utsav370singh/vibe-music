@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { TrackList, parseSaavnTrack } from './track-list'
-import { ChevronLeft, User } from 'lucide-react'
+import { ChevronLeft, Loader2, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import type { Track } from '@/stores/player-store'
@@ -29,13 +29,15 @@ function getArtistImage(artist: SaavnArtist): string {
 export function ArtistGrid({ artists }: ArtistGridProps) {
   const [selectedArtist, setSelectedArtist] = useState<SaavnArtist | null>(null)
   const [topTracks, setTopTracks] = useState<Track[]>([])
-  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
 
   const handleSelectArtist = async (artist: SaavnArtist) => {
     setSelectedArtist(artist)
-    setLoading(true)
+    setTopTracks([])
+    setInitialLoading(true)
     try {
       const res = await fetch(`/api/search/artist-top-tracks?id=${artist.id}&page=1`)
       const data = await res.json()
@@ -47,15 +49,29 @@ export function ArtistGrid({ artists }: ArtistGridProps) {
     } catch (error) {
       console.error('Failed to fetch artist tracks:', error)
     } finally {
-      setLoading(false)
+      setInitialLoading(false)
     }
   }
 
   const loadMore = async () => {
     if (!selectedArtist) return
-    setLoading(true)
+    setLoadingMore(true)
     const next = page + 1
-    try { const res = await fetch(`/api/search/artist-top-tracks?id=${selectedArtist.id}&page=${next}`); const data = await res.json(); if (data.data) { setTopTracks(v => [...v, ...data.data.map(parseSaavnTrack)]); setPage(next); setHasMore(Boolean(data.hasMore)) } } finally { setLoading(false) }
+    try {
+      const res = await fetch(`/api/search/artist-top-tracks?id=${selectedArtist.id}&page=${next}`)
+      const data = await res.json()
+      if (data.data) {
+        const incoming = data.data.map(parseSaavnTrack) as Track[]
+        setTopTracks(current => {
+          const knownIds = new Set(current.map(track => track.id))
+          return [...current, ...incoming.filter(track => track.id && !knownIds.has(track.id))]
+        })
+        setPage(next)
+        setHasMore(Boolean(data.hasMore))
+      }
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   if (selectedArtist) {
@@ -86,12 +102,12 @@ export function ArtistGrid({ artists }: ArtistGridProps) {
           </div>
         </div>
 
-        {loading ? (
+        {initialLoading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <div className="animate-pulse">Loading tracks...</div>
           </div>
         ) : (
-          <><TrackList tracks={topTracks} showIndex />{hasMore && <div className="flex justify-center mt-5"><Button variant="secondary" onClick={() => void loadMore()}>Load more songs</Button></div>}</>
+          <><TrackList tracks={topTracks} showIndex />{hasMore && <div className="flex justify-center mt-5"><Button variant="secondary" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}{loadingMore ? 'Loading next songs...' : 'Load more songs'}</Button></div>}</>
         )}
       </div>
     )

@@ -9,7 +9,7 @@ import { HomePage } from '@/components/music/home-page'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePlayerStore } from '@/stores/player-store'
 import { Button } from '@/components/ui/button'
-import { Music, Heart, Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react'
+import { Heart, Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
@@ -64,7 +64,7 @@ export default function MusicPage() {
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
           <div className="flex items-center gap-2">
-            <Music className="w-5 h-5 text-primary" />
+            <img src="/logo.svg" alt="Vibe" className="w-6 h-6 rounded-md" />
             <span className="font-bold">Vibe</span>
           </div>
         </div>
@@ -121,9 +121,7 @@ export default function MusicPage() {
         >
           <div className="p-5 pt-6 hidden lg:block">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Music className="w-5 h-5 text-primary" />
-              </div>
+              <img src="/logo.svg" alt="Vibe" className="w-9 h-9 rounded-lg" />
               <div>
                 <h1 className="font-bold text-lg leading-tight">Vibe</h1>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Ad-Free Music</p>

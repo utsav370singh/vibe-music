@@ -12,17 +12,24 @@ import type { Track } from '@/stores/player-store'
 import type { SaavnArtist } from './artist-grid'
 import type { SaavnAlbum } from './album-grid'
 
+function appendUniqueById<T extends { id: string }>(current: T[], incoming: T[]) {
+  const knownIds = new Set(current.map(item => item.id))
+  return [...current, ...incoming.filter(item => item.id && !knownIds.has(item.id))]
+}
+
 export function SearchSection() {
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'track' | 'artist' | 'album'>('track')
   const [tracks, setTracks] = useState<Track[]>([])
   const [artists, setArtists] = useState<SaavnArtist[]>([])
   const [albums, setAlbums] = useState<SaavnAlbum[]>([])
-  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [searched, setSearched] = useState(false)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const requestIdRef = useRef(0)
 
   const performSearch = useCallback(async (searchQuery: string, searchType: string, nextPage = 0, append = false) => {
     if (!searchQuery.trim()) {
@@ -30,27 +37,41 @@ export function SearchSection() {
       return
     }
 
-    setLoading(true)
+    const requestId = append ? requestIdRef.current : ++requestIdRef.current
+    if (append) setLoadingMore(true)
+    else {
+      setInitialLoading(true)
+      setLoadingMore(false)
+      setTracks([])
+      setArtists([])
+      setAlbums([])
+    }
     setSearched(true)
 
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}&page=${nextPage}`)
       const data = await res.json()
+      if (requestId !== requestIdRef.current) return
       setPage(nextPage)
       setHasMore(Boolean(data.hasMore))
 
       if (searchType === 'track') {
         const parsed = (data.data || []).map(parseSaavnTrack)
-        setTracks(prev => append ? [...prev, ...parsed] : parsed)
+        setTracks(prev => append ? appendUniqueById(prev, parsed) : parsed)
       } else if (searchType === 'artist') {
-        setArtists(prev => append ? [...prev, ...(data.data as SaavnArtist[] || [])] : (data.data as SaavnArtist[] || []))
+        const incoming = (data.data as SaavnArtist[] | undefined) || []
+        setArtists(prev => append ? appendUniqueById(prev, incoming) : incoming)
       } else if (searchType === 'album') {
-        setAlbums(prev => append ? [...prev, ...(data.data as SaavnAlbum[] || [])] : (data.data as SaavnAlbum[] || []))
+        const incoming = (data.data as SaavnAlbum[] | undefined) || []
+        setAlbums(prev => append ? appendUniqueById(prev, incoming) : incoming)
       }
     } catch (error) {
       console.error('Search failed:', error)
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) {
+        setInitialLoading(false)
+        setLoadingMore(false)
+      }
     }
   }, [])
 
@@ -70,11 +91,14 @@ export function SearchSection() {
   }
 
   const clearSearch = () => {
+    requestIdRef.current += 1
     setQuery('')
     setTracks([])
     setArtists([])
     setAlbums([])
     setSearched(false)
+    setInitialLoading(false)
+    setLoadingMore(false)
   }
 
   useEffect(() => {
@@ -118,7 +142,7 @@ export function SearchSection() {
 
       {/* Results */}
       <div className="min-h-[300px]">
-        {loading ? (
+        {initialLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
@@ -138,7 +162,12 @@ export function SearchSection() {
           </div>
         )}
       </div>
-      {searched && !loading && hasMore && <div className="flex justify-center pt-2"><Button variant="secondary" onClick={() => performSearch(query, type, page + 1, true)}>Load more results</Button></div>}
+      {searched && !initialLoading && hasMore && <div className="flex justify-center pt-2">
+        <Button variant="secondary" disabled={loadingMore} onClick={() => performSearch(query, type, page + 1, true)}>
+          {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+          {loadingMore ? 'Loading next 10...' : 'Load next 10'}
+        </Button>
+      </div>}
     </div>
   )
 }
