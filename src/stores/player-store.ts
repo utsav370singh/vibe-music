@@ -115,9 +115,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   },
 
   next: () => {
-    const { queue, currentIndex, repeatMode } = get()
+    const { queue, currentIndex } = get()
     if (queue.length === 0) return
-    if (repeatMode === 'off' && currentIndex === queue.length - 1) { set({ isPlaying: false, currentTime: 0 }); return }
     const nextIndex = (currentIndex + 1) % queue.length
     set({
       currentIndex: nextIndex,
@@ -128,12 +127,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   },
 
   previous: () => {
-    const { queue, currentIndex, currentTime } = get()
+    const { queue, currentIndex } = get()
     if (queue.length === 0) return
-    if (currentTime > 3) {
-      set({ currentTime: 0 })
-      return
-    }
     const prevIndex = (currentIndex - 1 + queue.length) % queue.length
     set({
       currentIndex: prevIndex,

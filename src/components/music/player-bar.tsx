@@ -36,12 +36,15 @@ export function PlayerBar() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const progressContainerRef = useRef<HTMLDivElement>(null)
   const previousTrackIdRef = useRef<string | null>(null)
+  const duration = currentTrack?.duration || 0
+  const displayTime = isDragging ? dragTime : currentTime
 
   // Create audio element once
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
       audioRef.current.preload = 'auto'
+      audioRef.current.setAttribute('playsinline', '')
     }
 
     const audio = audioRef.current
@@ -53,7 +56,18 @@ export function PlayerBar() {
     }
 
     const handleEnded = () => {
-      if (repeatMode === 'one') { audio.currentTime = 0; void audio.play() } else next()
+      if (repeatMode === 'one') {
+        audio.currentTime = 0
+        void audio.play()
+        return
+      }
+      const player = usePlayerStore.getState()
+      if (repeatMode === 'off' && player.currentIndex >= player.queue.length - 1) {
+        player.pause()
+        player.setCurrentTime(audio.duration || player.currentTrack?.duration || 0)
+        return
+      }
+      player.next()
     }
 
     const handleWaiting = () => setBuffering(true)
@@ -118,6 +132,71 @@ export function PlayerBar() {
       audioRef.current.volume = volume
     }
   }, [volume])
+
+  // Expose playback controls and song details to browser/OS lock screens.
+  useEffect(() => {
+    if (!currentTrack || !('mediaSession' in navigator)) return
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTrack.title,
+      artist: currentTrack.artist,
+      album: currentTrack.album,
+      artwork: currentTrack.coverUrl ? [{ src: currentTrack.coverUrl }] : [],
+    })
+
+    const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try { navigator.mediaSession.setActionHandler(action, handler) } catch {}
+    }
+    const seek = (time: number) => {
+      const audio = audioRef.current
+      if (!audio || !Number.isFinite(time)) return
+      const nextTime = Math.max(0, Math.min(time, audio.duration || currentTrack.duration || time))
+      audio.currentTime = nextTime
+      usePlayerStore.getState().setCurrentTime(nextTime)
+    }
+
+    setHandler('play', () => usePlayerStore.getState().resume())
+    setHandler('pause', () => usePlayerStore.getState().pause())
+    setHandler('nexttrack', () => usePlayerStore.getState().next())
+    setHandler('previoustrack', () => usePlayerStore.getState().previous())
+    setHandler('seekto', (details) => {
+      if (typeof details.seekTime === 'number') seek(details.seekTime)
+    })
+    setHandler('seekbackward', (details) => {
+      const audio = audioRef.current
+      seek((audio?.currentTime || 0) - (details.seekOffset || 10))
+    })
+    setHandler('seekforward', (details) => {
+      const audio = audioRef.current
+      seek((audio?.currentTime || 0) + (details.seekOffset || 10))
+    })
+
+    return () => {
+      setHandler('play', null)
+      setHandler('pause', null)
+      setHandler('nexttrack', null)
+      setHandler('previoustrack', null)
+      setHandler('seekto', null)
+      setHandler('seekbackward', null)
+      setHandler('seekforward', null)
+    }
+  }, [currentTrack])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+  }, [isPlaying])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || duration <= 0) return
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: audioRef.current?.playbackRate || 1,
+        position: Math.max(0, Math.min(displayTime, duration)),
+      })
+    } catch {}
+  }, [displayTime, duration])
 
   useEffect(() => {
     if (!mobileDrawerOpen) return
@@ -229,8 +308,6 @@ export function PlayerBar() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  const duration = currentTrack?.duration || 0
-  const displayTime = isDragging ? dragTime : currentTime
   const progress = duration > 0 ? Math.min((displayTime / duration) * 100, 100) : 0
   const isLiked = currentTrack ? likedTrackIds.has(currentTrack.id) : false
 

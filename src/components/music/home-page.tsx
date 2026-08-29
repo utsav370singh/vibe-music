@@ -111,22 +111,25 @@ function PlaylistRow({ playlist, tracks, onPlayAll }: { playlist: Playlist; trac
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {tracks.slice(0, 4).map((track) => (
-          <TrackCard key={track.id} track={track} />
+          <TrackCard key={track.id} track={track} queue={tracks} />
         ))}
       </div>
     </motion.div>
   )
 }
 
-function TrackCard({ track }: { track: Track }) {
+function TrackCard({ track, queue }: { track: Track; queue: Track[] }) {
   const { playTrack } = usePlayerStore()
   const { user, requestAuth } = useAuthStore()
+  const playableQueue = queue.filter((item) => item.previewUrl)
 
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      onClick={() => user ? playTrack(track) : requestAuth({ type: 'play', track })}
+      onClick={() => user
+        ? playTrack(track, playableQueue)
+        : requestAuth({ type: 'play', track, queue: playableQueue })}
       className={`bg-gradient-to-br from-primary/10 to-secondary hover:from-primary/20 hover:to-accent rounded-xl p-3 text-left transition-all cursor-pointer group border border-transparent hover:border-border/50`}
     >
       <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2.5 relative">
