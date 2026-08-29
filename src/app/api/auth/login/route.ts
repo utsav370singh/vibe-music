@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession, isAdminUsername, setSessionCookie } from '@/lib/auth'
 
@@ -49,6 +50,12 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Login error:', error)
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return NextResponse.json(
+        { error: 'The database is unavailable. Please check the MongoDB Atlas network access settings.', code: 'DATABASE_UNAVAILABLE' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

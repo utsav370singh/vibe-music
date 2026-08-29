@@ -71,6 +71,8 @@ export function AuthModal() {
         setError('Incorrect administrator password. Please try again.')
       } else if (err instanceof Error && err.message === 'ADMIN_NOT_CONFIGURED') {
         setError('Administrator login is not configured. Add ADMIN_PASSWORD to the server environment.')
+      } else if (err instanceof Error && err.message === 'DATABASE_UNAVAILABLE') {
+        setError('The database is unavailable. Please check MongoDB Atlas Network Access and try again.')
       } else setError(err instanceof Error ? err.message : 'Something went wrong')
     }
   }
