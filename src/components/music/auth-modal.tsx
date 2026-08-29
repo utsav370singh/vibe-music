@@ -44,14 +44,15 @@ export function AuthModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const normalizedUsername = username.trim().toLowerCase()
 
     try {
       if (mode === 'login') {
-        await login(username, password || undefined)
-        toast({ title: 'Welcome back!', description: `Logged in as ${username}` })
+        await login(normalizedUsername, password || undefined)
+        toast({ title: 'Welcome back!', description: `Logged in as ${normalizedUsername}` })
       } else {
-        await register(username, password || undefined)
-        toast({ title: 'Account created!', description: `Welcome, ${username}! Your playlist is ready.` })
+        await register(normalizedUsername, password || undefined)
+        toast({ title: 'Account created!', description: `Welcome, ${normalizedUsername}! Your playlist is ready.` })
       }
       const pending = takePendingAction()
       if (pending?.type === 'play') {
@@ -64,6 +65,12 @@ export function AuthModal() {
       if (err instanceof Error && err.message === 'ADMIN_PASSWORD_REQUIRED') {
         setPasswordRequired(true)
         setError('Enter the administrator password to continue.')
+      } else if (err instanceof Error && err.message === 'INVALID_ADMIN_PASSWORD') {
+        setPassword('')
+        setPasswordRequired(true)
+        setError('Incorrect administrator password. Please try again.')
+      } else if (err instanceof Error && err.message === 'ADMIN_NOT_CONFIGURED') {
+        setError('Administrator login is not configured. Add ADMIN_PASSWORD to the server environment.')
       } else setError(err instanceof Error ? err.message : 'Something went wrong')
     }
   }
@@ -101,10 +108,17 @@ export function AuthModal() {
             <Input
               placeholder={mode === 'login' ? 'Enter your username' : 'Choose a username'}
               value={username}
-              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              onChange={(e) => {
+                setUsername(e.target.value.toLowerCase())
+                if (passwordRequired) {
+                  setPassword('')
+                  setPasswordRequired(false)
+                  setError('')
+                }
+              }}
               required
               minLength={3}
-              maxLength={20}
+              maxLength={80}
               className="pl-10 bg-secondary border-border h-11"
               autoFocus
               disabled={isLoading}
@@ -118,7 +132,7 @@ export function AuthModal() {
 
           {mode === 'register' && (
             <p className="text-xs text-muted-foreground text-center">
-              Only letters, numbers, and underscores. 3-20 characters.
+              Usernames use letters, numbers, and underscores (3-20 characters).
             </p>
           )}
 

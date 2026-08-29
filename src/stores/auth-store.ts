@@ -40,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ username, password }),
           })
           const data = await res.json()
+          if (data.requiresPassword) throw new Error('ADMIN_PASSWORD_REQUIRED')
           if (!res.ok) throw new Error(data.code || data.error)
           set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
@@ -57,6 +58,7 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ username, password }),
           })
           const data = await res.json()
+          if (data.requiresPassword) throw new Error('ADMIN_PASSWORD_REQUIRED')
           if (!res.ok) throw new Error(data.code || data.error)
           set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
@@ -71,9 +73,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       validateSession: async () => {
-        const res = await fetch('/api/auth/session')
-        if (!res.ok) set({ user: null })
-        else set({ user: await res.json() })
+        try {
+          const res = await fetch('/api/auth/session')
+          if (!res.ok) {
+            set({ user: null })
+            return
+          }
+          const data = await res.json()
+          set({ user: data.user ?? null })
+        } catch {
+          set({ user: null })
+        }
       },
 
       requestAuth: (pendingAction) => set({ authRequested: true, pendingAction: pendingAction || null }),

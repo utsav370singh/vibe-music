@@ -4,6 +4,8 @@ import { isAdminUsername } from '@/lib/auth'
 
 export async function GET() {
   const user = await getSessionUser()
-  if (!user) return NextResponse.json({ error: 'No active session' }, { status: 401 })
-  return NextResponse.json({ id: user.id, username: user.username, isAdmin: isAdminUsername(user.username) })
+  if (!user) return NextResponse.json({ user: null })
+  return NextResponse.json({
+    user: { id: user.id, username: user.username, isAdmin: isAdminUsername(user.username) },
+  })
 }

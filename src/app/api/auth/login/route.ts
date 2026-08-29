@@ -12,8 +12,23 @@ export async function POST(req: NextRequest) {
 
     const trimmed = username.trim().toLowerCase()
     const adminLogin = isAdminUsername(trimmed)
-    if (adminLogin && password !== process.env.ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Administrator password required', code: 'ADMIN_PASSWORD_REQUIRED', requiresPassword: true }, { status: 428 })
+    if (adminLogin) {
+      const adminPassword = process.env.ADMIN_PASSWORD
+      if (!adminPassword) {
+        return NextResponse.json(
+          { error: 'Administrator login is not configured', code: 'ADMIN_NOT_CONFIGURED' },
+          { status: 503 }
+        )
+      }
+      if (typeof password !== 'string' || password.length === 0) {
+        return NextResponse.json({ requiresPassword: true, code: 'ADMIN_PASSWORD_REQUIRED' })
+      }
+      if (password !== adminPassword) {
+        return NextResponse.json(
+          { error: 'Incorrect administrator password', code: 'INVALID_ADMIN_PASSWORD' },
+          { status: 401 }
+        )
+      }
     }
     const user = adminLogin
       ? await db.user.upsert({ where: { username: trimmed }, create: { username: trimmed }, update: {} })
