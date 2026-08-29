@@ -5,7 +5,7 @@ import { usePlayerStore } from '@/stores/player-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
-import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music, Loader2, Repeat2 } from 'lucide-react'
+import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music, Loader2, Repeat2, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getStreamUrl } from './track-list'
 import { usePlaylistDialogStore } from '@/stores/playlist-store'
@@ -33,6 +33,7 @@ export function PlayerBar() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
   const [buffering, setBuffering] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const progressContainerRef = useRef<HTMLDivElement>(null)
   const previousTrackIdRef = useRef<string | null>(null)
 
@@ -118,6 +119,20 @@ export function PlayerBar() {
     }
   }, [volume])
 
+  useEffect(() => {
+    if (!mobileDrawerOpen) return
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileDrawerOpen(false)
+    }
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [mobileDrawerOpen])
+
   // Drag-to-seek helpers
   const getTimeFromEvent = useCallback((e: React.MouseEvent | React.PointerEvent, element: HTMLElement) => {
     const rect = element.getBoundingClientRect()
@@ -155,15 +170,30 @@ export function PlayerBar() {
     setVolume(value[0])
   }, [setVolume])
 
+  const handleDrawerSeek = useCallback((time: number) => {
+    const audio = audioRef.current
+    if (audio && audio.readyState >= 1) audio.currentTime = time
+    setCurrentTime(time)
+  }, [setCurrentTime])
+
+  const openMobileDrawer = useCallback(() => {
+    if (window.matchMedia('(max-width: 767px)').matches) setMobileDrawerOpen(true)
+  }, [])
+
   const handleLike = useCallback(async () => {
     if (!currentTrack) return
     if (!user) {
+      setMobileDrawerOpen(false)
       requestAuth({ type: 'playlist', track: currentTrack })
       return
     }
 
     const isLiked = likedTrackIds.has(currentTrack.id)
     toggleLike(currentTrack.id)
+    if (!isLiked) {
+      setMobileDrawerOpen(false)
+      openPlaylist(currentTrack)
+    }
 
     try {
       if (isLiked) {
@@ -186,7 +216,6 @@ export function PlayerBar() {
             duration: currentTrack.duration,
           }),
         })
-        openPlaylist(currentTrack)
       }
     } catch {
       toggleLike(currentTrack.id)
@@ -217,6 +246,7 @@ export function PlayerBar() {
   }
 
   return (
+    <>
     <AnimatePresence mode="wait">
       <motion.div
         key={currentTrack.id}
@@ -224,7 +254,8 @@ export function PlayerBar() {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 20, opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed bottom-0 left-0 right-0 h-20 bg-card/95 backdrop-blur-xl border-t border-border z-50"
+        className="fixed bottom-0 left-0 right-0 h-20 bg-card/95 backdrop-blur-xl border-t border-border z-50 md:cursor-default cursor-pointer"
+        onClick={openMobileDrawer}
       >
         <div className="h-full flex flex-col justify-center px-4 gap-1">
           {/* Draggable seek bar */}
@@ -235,6 +266,7 @@ export function PlayerBar() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={() => { if (isDragging) handlePointerUp() }}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="h-full bg-secondary/80 relative mx-0">
               <div
@@ -272,7 +304,7 @@ export function PlayerBar() {
             </div>
 
             {/* Playback controls */}
-            <div className="flex flex-col items-center gap-1 flex-1">
+            <div className="flex flex-col items-center gap-1 flex-1" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -311,7 +343,7 @@ export function PlayerBar() {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-0 sm:gap-2 w-auto sm:w-1/3 justify-end">
+            <div className="flex items-center gap-0 sm:gap-2 w-auto sm:w-1/3 justify-end" onClick={(event) => event.stopPropagation()}>
               <Button variant="ghost" size="icon" title={`Repeat: ${repeatMode}`} className={`h-8 w-8 cursor-pointer relative ${repeatMode !== 'off' ? 'text-primary' : 'text-muted-foreground'}`} onClick={cycleRepeat}>
                 <Repeat2 className="w-4 h-4" />{repeatMode === 'one' && <span className="absolute text-[8px] font-bold">1</span>}
               </Button>
@@ -345,5 +377,92 @@ export function PlayerBar() {
         </div>
       </motion.div>
     </AnimatePresence>
+    <AnimatePresence>
+      {mobileDrawerOpen && (
+        <motion.div
+          className="fixed inset-0 z-[60] md:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Now playing ${currentTrack.title}`}
+        >
+          <button
+            type="button"
+            aria-label="Close now playing"
+            className="absolute inset-0 h-full w-full cursor-default bg-black/65 touch-none"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          <motion.section
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className="absolute inset-x-0 bottom-0 h-[50dvh] overflow-hidden rounded-t-3xl border-t border-border bg-card px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-muted-foreground/30" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Now playing</p>
+                <p className="max-w-[70vw] truncate text-sm font-semibold">{currentTrack.title}</p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => setMobileDrawerOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="mt-3 flex min-h-0 items-center gap-4">
+              <div className="aspect-square w-[min(28vw,7rem)] flex-shrink-0 overflow-hidden rounded-2xl bg-secondary shadow-lg">
+                {currentTrack.coverUrl ? (
+                  <img src={currentTrack.coverUrl} alt={currentTrack.album} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center"><Music className="h-8 w-8 text-muted-foreground" /></div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-bold">{currentTrack.title}</p>
+                <p className="truncate text-sm text-muted-foreground">{currentTrack.artist}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground/70">{currentTrack.album}</p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <input
+                type="range"
+                min={0}
+                max={Math.max(duration, 1)}
+                step={1}
+                value={Math.min(displayTime, Math.max(duration, 1))}
+                onChange={(event) => handleDrawerSeek(Number(event.target.value))}
+                aria-label="Song progress"
+                className="h-1.5 w-full cursor-pointer accent-primary"
+              />
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>{formatTime(displayTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between px-2">
+              <Button variant="ghost" size="icon" title={`Repeat: ${repeatMode}`} className={repeatMode !== 'off' ? 'text-primary' : 'text-muted-foreground'} onClick={cycleRepeat}>
+                <Repeat2 className="h-5 w-5" />
+                {repeatMode === 'one' && <span className="absolute text-[8px] font-bold">1</span>}
+              </Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={previous}><SkipBack className="h-6 w-6 fill-current" /></Button>
+              <Button variant="default" size="icon" className="h-14 w-14 rounded-full" onClick={togglePlay}>
+                {buffering ? <Loader2 className="h-6 w-6 animate-spin" /> : isPlaying ? <Pause className="h-6 w-6 fill-current" /> : <Play className="ml-0.5 h-6 w-6 fill-current" />}
+              </Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={next}><SkipForward className="h-6 w-6 fill-current" /></Button>
+              <Button variant="ghost" size="icon" className={isLiked ? 'text-primary' : 'text-muted-foreground'} onClick={handleLike}>
+                <Heart className={`h-5 w-5 ${isLiked ? 'fill-current' : ''}`} />
+              </Button>
+            </div>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   )
 }

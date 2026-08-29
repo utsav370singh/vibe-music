@@ -79,6 +79,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
 
     const isLiked = likedTrackIds.has(track.id)
     toggleLike(track.id)
+    if (!isLiked) openPlaylist(track)
 
     try {
       if (isLiked) {
@@ -101,7 +102,6 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
             duration: track.duration,
           }),
         })
-        openPlaylist(track)
       }
     } catch {
       toggleLike(track.id)
