@@ -74,13 +74,16 @@ export const useAuthStore = create<AuthState>()(
 
       validateSession: async () => {
         try {
-          const res = await fetch('/api/auth/session', { cache: 'no-store' })
+          const res = await fetch('/api/auth/session')
           if (!res.ok) {
+            set({ user: null })
             return
           }
           const data = await res.json()
           set({ user: data.user ?? null })
-        } catch {}
+        } catch {
+          set({ user: null })
+        }
       },
 
       requestAuth: (pendingAction) => set({ authRequested: true, pendingAction: pendingAction || null }),

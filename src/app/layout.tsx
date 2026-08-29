@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vibe - Ad-Free Music",
+  title: "Hidden Vibes",
   description: "Your personal ad-free music player. Search, stream, and save your favorite tracks.",
   icons: {
     icon: "/icon.svg",

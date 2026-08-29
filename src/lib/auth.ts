@@ -4,7 +4,6 @@ import { db } from '@/lib/db'
 
 export const SESSION_COOKIE = 'vibe_session'
 const SESSION_DAYS = 180
-const SESSION_MAX_AGE = SESSION_DAYS * 24 * 60 * 60
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 
 export async function createSession(userId: string) {
@@ -16,15 +15,7 @@ export async function createSession(userId: string) {
 
 export async function setSessionCookie(token: string, expiresAt: Date, secure: boolean) {
   const jar = await cookies()
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure,
-    path: '/',
-    expires: expiresAt,
-    maxAge: SESSION_MAX_AGE,
-    priority: 'high',
-  })
+  jar.set(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure, path: '/', expires: expiresAt })
 }
 
 export async function clearSessionCookie() {
