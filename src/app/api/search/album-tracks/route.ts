@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Album name or ID is required' }, { status: 400 })
     }
 
-    // Search for songs by album name to get album tracks
-    const query = albumName || albumId
-    const url = `${SAAVN_API}/search/songs?query=${encodeURIComponent(String(query))}&page=0`
+    const url = albumId
+      ? `${SAAVN_API}/albums?id=${encodeURIComponent(albumId)}`
+      : `${SAAVN_API}/search/songs?query=${encodeURIComponent(String(albumName))}&page=0`
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
       next: { revalidate: 300 },
@@ -30,17 +30,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch album tracks', data: [] })
     }
 
-    const results = data.data?.results || []
-    // Filter to only songs from the same album if albumId is provided
-    let tracks = results
-    if (albumId) {
-      tracks = results.filter((s: Record<string, unknown>) => {
-        const album = s.album as Record<string, string> | undefined
-        return album?.id === albumId
-      })
-      // If no matches by ID, return all results (search-based)
-      if (tracks.length === 0) tracks = results
-    }
+    const tracks = albumId ? (data.data?.songs || []) : (data.data?.results || [])
 
     return NextResponse.json({ data: tracks, total: tracks.length })
   } catch (error) {

@@ -6,13 +6,17 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToast } from '@/hooks/use-toast'
-import { Music, UserPlus, LogIn, AtSign } from 'lucide-react'
+import { Music, UserPlus, LogIn, AtSign, Lock } from 'lucide-react'
+import { usePlayerStore } from '@/stores/player-store'
+import { usePlaylistDialogStore } from '@/stores/playlist-store'
 
 export function AuthModal() {
-  const [mode, setMode] = useState<'login' | 'register'>('register')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
-  const { login, register, isLoading, authRequested, clearAuthRequest, user } = useAuthStore()
+  const [password, setPassword] = useState('')
+  const [passwordRequired, setPasswordRequired] = useState(false)
+  const { login, register, isLoading, authRequested, clearAuthRequest, takePendingAction, user } = useAuthStore()
   const { toast } = useToast()
 
   // Open modal when authRequested is true, or when manually opened
@@ -24,6 +28,8 @@ export function AuthModal() {
     if (!v) {
       setUsername('')
       setError('')
+      setPassword('')
+      setPasswordRequired(false)
       clearAuthRequest()
       return
     }
@@ -41,14 +47,24 @@ export function AuthModal() {
 
     try {
       if (mode === 'login') {
-        await login(username)
+        await login(username, password || undefined)
         toast({ title: 'Welcome back!', description: `Logged in as ${username}` })
       } else {
-        await register(username)
+        await register(username, password || undefined)
         toast({ title: 'Account created!', description: `Welcome, ${username}! Your playlist is ready.` })
       }
+      const pending = takePendingAction()
+      if (pending?.type === 'play') {
+        if (pending.queue) usePlayerStore.getState().setQueue(pending.queue, Math.max(0, pending.queue.findIndex(t => t.id === pending.track.id)))
+        else usePlayerStore.getState().playTrack(pending.track)
+      } else if (pending?.type === 'playlist') {
+        usePlaylistDialogStore.getState().openForTrack(pending.track)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      if (err instanceof Error && err.message === 'ADMIN_PASSWORD_REQUIRED') {
+        setPasswordRequired(true)
+        setError('Enter the administrator password to continue.')
+      } else setError(err instanceof Error ? err.message : 'Something went wrong')
     }
   }
 
@@ -56,6 +72,8 @@ export function AuthModal() {
     setMode(newMode)
     setUsername('')
     setError('')
+    setPassword('')
+    setPasswordRequired(false)
   }
 
   return (
@@ -93,6 +111,11 @@ export function AuthModal() {
             />
           </div>
 
+          {passwordRequired && <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input type="password" autoFocus placeholder="Administrator password" value={password} onChange={e => setPassword(e.target.value)} className="pl-10" />
+          </div>}
+
           {mode === 'register' && (
             <p className="text-xs text-muted-foreground text-center">
               Only letters, numbers, and underscores. 3-20 characters.
@@ -106,7 +129,7 @@ export function AuthModal() {
           <Button
             type="submit"
             className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer font-medium"
-            disabled={isLoading || username.length < 3}
+            disabled={isLoading || username.length < 3 || (passwordRequired && !password)}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

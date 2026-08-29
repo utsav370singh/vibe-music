@@ -3,21 +3,36 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String      @id @default(cuid())
-  username  String      @unique
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  username   String          @unique
+  isBlocked  Boolean         @default(false)
+  lastSeenAt DateTime        @default(now())
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
   likedSongs LikedSong[]
+  playlists  Playlist[]
+  sessions   Session[]
+  sharedWith PlaylistShare[]
+}
+
+model Session {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  tokenHash String   @unique
+  userId    String   @db.ObjectId
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model LikedSong {
-  id         String   @id @default(cuid())
-  userId     String
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
   trackId    String
   title      String
   artist     String
@@ -27,7 +42,48 @@ model LikedSong {
   duration   Int
   createdAt  DateTime @default(now())
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
+}
+
+model Playlist {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String          @db.ObjectId
+  name        String
+  description String          @default("")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  owner       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songs       PlaylistSong[]
+  shares      PlaylistShare[]
+
+  @@unique([userId, name])
+}
+
+model PlaylistSong {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  playlistId String   @db.ObjectId
+  trackId    String
+  title      String
+  artist     String
+  album      String
+  coverUrl   String
+  previewUrl String
+  duration   Int
+  createdAt  DateTime @default(now())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, trackId])
+}
+
+model PlaylistShare {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  playlistId String   @db.ObjectId
+  userId     String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, userId])
 }

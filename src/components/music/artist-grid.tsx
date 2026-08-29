@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import type { Track } from '@/stores/player-store'
 
-interface SaavnArtist {
+export interface SaavnArtist {
   id: string
   name: string
   url?: string
@@ -30,21 +30,32 @@ export function ArtistGrid({ artists }: ArtistGridProps) {
   const [selectedArtist, setSelectedArtist] = useState<SaavnArtist | null>(null)
   const [topTracks, setTopTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
 
   const handleSelectArtist = async (artist: SaavnArtist) => {
     setSelectedArtist(artist)
     setLoading(true)
     try {
-      const res = await fetch(`/api/search/artist-top-tracks?id=${artist.id}`)
+      const res = await fetch(`/api/search/artist-top-tracks?id=${artist.id}&page=1`)
       const data = await res.json()
       if (data.data) {
         setTopTracks(data.data.map(parseSaavnTrack))
+        setPage(1)
+        setHasMore(Boolean(data.hasMore))
       }
     } catch (error) {
       console.error('Failed to fetch artist tracks:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadMore = async () => {
+    if (!selectedArtist) return
+    setLoading(true)
+    const next = page + 1
+    try { const res = await fetch(`/api/search/artist-top-tracks?id=${selectedArtist.id}&page=${next}`); const data = await res.json(); if (data.data) { setTopTracks(v => [...v, ...data.data.map(parseSaavnTrack)]); setPage(next); setHasMore(Boolean(data.hasMore)) } } finally { setLoading(false) }
   }
 
   if (selectedArtist) {
@@ -80,7 +91,7 @@ export function ArtistGrid({ artists }: ArtistGridProps) {
             <div className="animate-pulse">Loading tracks...</div>
           </div>
         ) : (
-          <TrackList tracks={topTracks} showIndex />
+          <><TrackList tracks={topTracks} showIndex />{hasMore && <div className="flex justify-center mt-5"><Button variant="secondary" onClick={() => void loadMore()}>Load more songs</Button></div>}</>
         )}
       </div>
     )

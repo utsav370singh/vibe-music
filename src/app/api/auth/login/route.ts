@@ -1,23 +1,36 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { createSession, isAdminUsername, setSessionCookie } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
-    const { username } = await req.json()
+    const { username, password } = await req.json()
 
     if (!username || typeof username !== 'string') {
       return NextResponse.json({ error: 'Username is required' }, { status: 400 })
     }
 
     const trimmed = username.trim().toLowerCase()
-    const user = await db.user.findUnique({ where: { username: trimmed } })
+    const adminLogin = isAdminUsername(trimmed)
+    if (adminLogin && password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Administrator password required', code: 'ADMIN_PASSWORD_REQUIRED', requiresPassword: true }, { status: 428 })
+    }
+    const user = adminLogin
+      ? await db.user.upsert({ where: { username: trimmed }, create: { username: trimmed }, update: {} })
+      : await db.user.findUnique({ where: { username: trimmed } })
     if (!user) {
       return NextResponse.json({ error: 'Username not found. Please sign up first!' }, { status: 404 })
     }
+    if (user.isBlocked) return NextResponse.json({ error: 'This username has been blocked by the administrator.' }, { status: 403 })
+
+    const session = await createSession(user.id)
+    const secureCookie = req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'
+    await setSessionCookie(session.token, session.expiresAt, secureCookie)
 
     return NextResponse.json({
       id: user.id,
       username: user.username,
+      isAdmin: adminLogin,
     })
   } catch (error) {
     console.error('Login error:', error)

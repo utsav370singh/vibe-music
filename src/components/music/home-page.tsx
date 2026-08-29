@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { usePlayerStore, type Track } from '@/stores/player-store'
-import { TrackList, parseSaavnTrack, getStreamUrl } from './track-list'
+import { parseSaavnTrack } from './track-list'
 import { Button } from '@/components/ui/button'
 import { Play, ChevronRight, Loader2, TrendingUp } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useAuthStore } from '@/stores/auth-store'
 
 interface Playlist {
   id: string
@@ -119,12 +120,13 @@ function PlaylistRow({ playlist, tracks, onPlayAll }: { playlist: Playlist; trac
 
 function TrackCard({ track }: { track: Track }) {
   const { playTrack } = usePlayerStore()
+  const { user, requestAuth } = useAuthStore()
 
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      onClick={() => playTrack(track)}
+      onClick={() => user ? playTrack(track) : requestAuth({ type: 'play', track })}
       className={`bg-gradient-to-br from-primary/10 to-secondary hover:from-primary/20 hover:to-accent rounded-xl p-3 text-left transition-all cursor-pointer group border border-transparent hover:border-border/50`}
     >
       <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-2.5 relative">
@@ -152,6 +154,7 @@ export function HomePage() {
   const [trackMap, setTrackMap] = useState<Record<string, Track[]>>({})
   const [loading, setLoading] = useState(true)
   const { setQueue } = usePlayerStore()
+  const { user, requestAuth } = useAuthStore()
 
   const fetchSuggestions = useCallback(async () => {
     try {
@@ -179,7 +182,9 @@ export function HomePage() {
 
   const handlePlayAll = (tracks: Track[]) => {
     const playable = tracks.filter((t) => t.previewUrl)
-    if (playable.length > 0) setQueue(playable)
+    if (playable.length === 0) return
+    if (!user) requestAuth({ type: 'play', track: playable[0], queue: playable })
+    else setQueue(playable)
   }
 
   if (loading) {

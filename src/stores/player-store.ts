@@ -19,6 +19,7 @@ interface PlayerState {
   isPlaying: boolean
   currentTime: number
   volume: number
+  repeatMode: 'off' | 'all' | 'one'
 
   // Current track
   currentTrack: Track | null
@@ -37,6 +38,7 @@ interface PlayerState {
   previous: () => void
   setCurrentTime: (time: number) => void
   setVolume: (volume: number) => void
+  cycleRepeat: () => void
   toggleLike: (trackId: string) => void
   setLikedTrackIds: (ids: string[]) => void
   clearQueue: () => void
@@ -48,6 +50,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   isPlaying: false,
   currentTime: 0,
   volume: 0.8,
+  repeatMode: 'off',
   currentTrack: null,
   likedTrackIds: new Set<string>(),
 
@@ -112,8 +115,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   },
 
   next: () => {
-    const { queue, currentIndex } = get()
+    const { queue, currentIndex, repeatMode } = get()
     if (queue.length === 0) return
+    if (repeatMode === 'off' && currentIndex === queue.length - 1) { set({ isPlaying: false, currentTime: 0 }); return }
     const nextIndex = (currentIndex + 1) % queue.length
     set({
       currentIndex: nextIndex,
@@ -141,6 +145,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
   setCurrentTime: (time) => set({ currentTime: time }),
   setVolume: (volume) => set({ volume: Math.max(0, Math.min(1, volume)) }),
+  cycleRepeat: () => set(({ repeatMode }) => ({ repeatMode: repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off' })),
 
   toggleLike: (trackId) => {
     const { likedTrackIds } = get()

@@ -1,9 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Track } from './player-store'
 
 interface User {
   id: string
   username: string
+  isAdmin: boolean
 }
 
 interface AuthState {
@@ -11,30 +13,34 @@ interface AuthState {
   isLoading: boolean
   authRequested: boolean // flag to open the auth modal
 
-  login: (username: string) => Promise<void>
-  register: (username: string) => Promise<void>
-  logout: () => void
-  requestAuth: () => void
+  login: (username: string, password?: string) => Promise<void>
+  register: (username: string, password?: string) => Promise<void>
+  pendingAction: { type: 'play' | 'playlist'; track: Track; queue?: Track[] } | null
+  logout: () => Promise<void>
+  validateSession: () => Promise<void>
+  requestAuth: (action?: { type: 'play' | 'playlist'; track: Track; queue?: Track[] }) => void
   clearAuthRequest: () => void
+  takePendingAction: () => AuthState['pendingAction']
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isLoading: false,
       authRequested: false,
+      pendingAction: null,
 
-      login: async (username: string) => {
+      login: async (username: string, password?: string) => {
         set({ isLoading: true })
         try {
           const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({ username, password }),
           })
           const data = await res.json()
-          if (!res.ok) throw new Error(data.error)
+          if (!res.ok) throw new Error(data.code || data.error)
           set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
           set({ isLoading: false })
@@ -42,16 +48,16 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (username: string) => {
+      register: async (username: string, password?: string) => {
         set({ isLoading: true })
         try {
           const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({ username, password }),
           })
           const data = await res.json()
-          if (!res.ok) throw new Error(data.error)
+          if (!res.ok) throw new Error(data.code || data.error)
           set({ user: data, isLoading: false, authRequested: false })
         } catch (error) {
           set({ isLoading: false })
@@ -59,12 +65,24 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
+      logout: async () => {
+        await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
         set({ user: null })
       },
 
-      requestAuth: () => set({ authRequested: true }),
+      validateSession: async () => {
+        const res = await fetch('/api/auth/session')
+        if (!res.ok) set({ user: null })
+        else set({ user: await res.json() })
+      },
+
+      requestAuth: (pendingAction) => set({ authRequested: true, pendingAction: pendingAction || null }),
       clearAuthRequest: () => set({ authRequested: false }),
+      takePendingAction: () => {
+        const action = get().pendingAction
+        set({ pendingAction: null })
+        return action
+      },
     }),
     {
       name: 'music-auth',

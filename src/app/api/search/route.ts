@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const query = searchParams.get('q')
     const type = searchParams.get('type') || 'track'
-    const page = parseInt(searchParams.get('page') || '0')
+    const page = Math.max(0, parseInt(searchParams.get('page') || '0'))
 
     if (!query) {
       return NextResponse.json({ error: 'Search query is required' }, { status: 400 })
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     const results = data.data?.results || []
     const total = data.data?.total || results.length
-    const hasMore = data.data?.lastPage === false || (page + 1) * 25 < total
+    const hasMore = data.data?.lastPage === false || page * Math.max(results.length, 1) < total
 
     return NextResponse.json({
       data: results,

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, Heart, Music } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { usePlaylistDialogStore } from '@/stores/playlist-store'
 
 interface TrackListProps {
   tracks: Track[]
@@ -51,14 +52,15 @@ export function getStreamUrl(saavnUrl: string): string {
 export function TrackList({ tracks, showIndex = false }: TrackListProps) {
   const { currentTrack, isPlaying, setQueue, togglePlay, likedTrackIds, toggleLike } = usePlayerStore()
   const { user, requestAuth } = useAuthStore()
+  const openPlaylist = usePlaylistDialogStore(s => s.openForTrack)
 
   const handlePlay = (track: Track) => {
+    const queueTracks = tracks.filter((t) => t.previewUrl)
+    if (!user) { requestAuth({ type: 'play', track, queue: queueTracks }); return }
     const isCurrentTrack = currentTrack?.id === track.id
     if (isCurrentTrack) {
       togglePlay()
     } else {
-      const trackIndex = tracks.findIndex((t) => t.id === track.id)
-      const queueTracks = tracks.filter((t) => t.previewUrl)
       const queueIndex = queueTracks.findIndex((t) => t.id === track.id)
       if (queueIndex >= 0) {
         setQueue(queueTracks, queueIndex)
@@ -71,7 +73,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
   const handleLike = async (track: Track, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!user) {
-      requestAuth()
+      requestAuth({ type: 'playlist', track })
       return
     }
 
@@ -82,14 +84,12 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
       if (isLiked) {
         await fetch(`/api/likes?trackId=${encodeURIComponent(track.id)}`, {
           method: 'DELETE',
-          headers: { 'x-username': user.username },
         })
       } else {
         await fetch('/api/likes', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-username': user.username,
           },
           body: JSON.stringify({
             trackId: track.id,
@@ -101,6 +101,7 @@ export function TrackList({ tracks, showIndex = false }: TrackListProps) {
             duration: track.duration,
           }),
         })
+        openPlaylist(track)
       }
     } catch {
       toggleLike(track.id)

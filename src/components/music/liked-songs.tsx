@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePlayerStore, type Track } from '@/stores/player-store'
 import { TrackList } from './track-list'
@@ -9,17 +9,15 @@ import { Button } from '@/components/ui/button'
 
 export function LikedSongs() {
   const { user, requestAuth } = useAuthStore()
-  const { setQueue, likedTrackIds, setLikedTrackIds } = usePlayerStore()
+  const { setQueue, setLikedTrackIds } = usePlayerStore()
   const [songs, setSongs] = useState<Track[]>([])
   const [loading, setLoading] = useState(false)
 
-  const fetchLikedSongs = async () => {
+  const fetchLikedSongs = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
-      const res = await fetch('/api/likes', {
-        headers: { 'x-username': user.username },
-      })
+      const res = await fetch('/api/likes')
       const data = await res.json()
       setSongs(data.map((s: Record<string, unknown>) => ({
         id: String(s.trackId),
@@ -36,11 +34,11 @@ export function LikedSongs() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, setLikedTrackIds])
 
   useEffect(() => {
     fetchLikedSongs()
-  }, [user])
+  }, [fetchLikedSongs])
 
   if (!user) {
     return (
@@ -50,7 +48,7 @@ export function LikedSongs() {
         <p className="text-sm text-muted-foreground mb-4">Your liked songs will appear here</p>
         <Button
           className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-          onClick={requestAuth}
+          onClick={() => requestAuth()}
         >
           <LogIn className="w-4 h-4 mr-2" />
           Sign In

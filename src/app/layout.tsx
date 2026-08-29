@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "Vibe - Ad-Free Music",
   description: "Your personal ad-free music player. Search, stream, and save your favorite tracks.",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>",
+    icon: "/logo.svg",
   },
 };
 

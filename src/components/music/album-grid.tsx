@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import type { Track } from '@/stores/player-store'
 
-interface SaavnAlbum {
+export interface SaavnAlbum {
   id: string
   name: string
   year?: string

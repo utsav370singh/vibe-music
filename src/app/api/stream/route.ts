@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAudio } from '@/lib/audio-cache'
+import { getSessionUser } from '@/lib/auth'
 
 // In-flight request dedup: if two requests ask for the same URL while it's downloading,
 // the second one waits for the first instead of starting a duplicate download.
@@ -23,6 +24,7 @@ async function getAudioDeduped(url: string): Promise<Buffer> {
 
 export async function GET(req: NextRequest) {
   try {
+    if (!await getSessionUser()) return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
     const { searchParams } = new URL(req.url)
     const encodedUrl = searchParams.get('url')
 
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest) {
 
       const chunkSize = end - start + 1
 
-      return new NextResponse(buffer.slice(start, end + 1), {
+      return new NextResponse(Uint8Array.from(buffer.slice(start, end + 1)).buffer, {
         status: 206,
         headers: {
           'Content-Type': 'audio/mpeg',
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Full file response
-    return new NextResponse(buffer, {
+    return new NextResponse(Uint8Array.from(buffer).buffer, {
       status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',

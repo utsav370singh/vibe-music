@@ -13,13 +13,19 @@ import { Music, Heart, Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
+import { PlaylistDialog } from '@/components/music/playlist-dialog'
+import { PlaylistLibrary } from '@/components/music/playlist-library'
+import { AdminDashboard } from '@/components/music/admin-dashboard'
+import { ListMusic, Shield } from 'lucide-react'
 
 export default function MusicPage() {
-  const { user, logout, requestAuth } = useAuthStore()
-  const [view, setView] = useState<'home' | 'search' | 'liked'>('home')
+  const { user, logout, requestAuth, validateSession } = useAuthStore()
+  const [view, setView] = useState<'home' | 'search' | 'liked' | 'playlists' | 'admin'>('home')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { setLikedTrackIds } = usePlayerStore()
+  const { setLikedTrackIds, clearQueue } = usePlayerStore()
   const { toast } = useToast()
+
+  useEffect(() => { void validateSession() }, [validateSession])
 
   // Load liked track IDs when user logs in
   useEffect(() => {
@@ -27,7 +33,7 @@ export default function MusicPage() {
       setLikedTrackIds([])
       return
     }
-    fetch('/api/likes', { headers: { 'x-username': user.username } })
+    fetch('/api/likes')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -37,8 +43,9 @@ export default function MusicPage() {
       .catch(() => {})
   }, [user, setLikedTrackIds])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
+    clearQueue()
     setView('home')
     toast({ title: 'Signed out', description: 'See you next time!' })
   }
@@ -84,7 +91,7 @@ export default function MusicPage() {
               variant="ghost"
               size="sm"
               className="h-8 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={requestAuth}
+              onClick={() => requestAuth()}
             >
               Sign In
             </Button>
@@ -164,6 +171,12 @@ export default function MusicPage() {
               <Heart className="w-4 h-4" />
               My Playlist
             </button>
+            <button onClick={() => { setView('playlists'); setSidebarOpen(false) }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${view === 'playlists' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'}`}>
+              <ListMusic className="w-4 h-4" />Playlists
+            </button>
+            {user?.isAdmin && <button onClick={() => { setView('admin'); setSidebarOpen(false) }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${view === 'admin' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'}`}>
+              <Shield className="w-4 h-4" />Admin
+            </button>}
           </nav>
 
           {/* User section at bottom */}
@@ -207,7 +220,7 @@ export default function MusicPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.15 }}
-              className="p-4 md:p-6 lg:p-8 max-w-5xl"
+              className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto w-full"
             >
               {view === 'home' && <HomePage />}
               {view === 'search' && (
@@ -220,6 +233,8 @@ export default function MusicPage() {
                 </div>
               )}
               {view === 'liked' && <LikedSongs />}
+              {view === 'playlists' && <PlaylistLibrary />}
+              {view === 'admin' && user?.isAdmin && <AdminDashboard />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -230,6 +245,7 @@ export default function MusicPage() {
 
       {/* Auth modal (self-managed via store) */}
       <AuthModal />
+      <PlaylistDialog />
     </div>
   )
 }

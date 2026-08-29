@@ -38,6 +38,7 @@ function cleanExpired() {
 }
 
 export async function getAudio(url: string): Promise<Buffer> {
+  cleanExpired()
   const key = hashKey(url)
   const cached = cache.get(key)
 

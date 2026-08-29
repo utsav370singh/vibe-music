@@ -5,9 +5,10 @@ import { usePlayerStore } from '@/stores/player-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
-import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music, Loader2 } from 'lucide-react'
+import { Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Heart, Music, Loader2, Repeat2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getStreamUrl } from './track-list'
+import { usePlaylistDialogStore } from '@/stores/playlist-store'
 
 export function PlayerBar() {
   const {
@@ -15,16 +16,19 @@ export function PlayerBar() {
     isPlaying,
     currentTime,
     volume,
+    repeatMode,
     likedTrackIds,
     togglePlay,
     next,
     previous,
     setCurrentTime,
     setVolume,
+    cycleRepeat,
     toggleLike,
   } = usePlayerStore()
 
   const { user, requestAuth } = useAuthStore()
+  const openPlaylist = usePlaylistDialogStore(s => s.openForTrack)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
@@ -48,7 +52,7 @@ export function PlayerBar() {
     }
 
     const handleEnded = () => {
-      next()
+      if (repeatMode === 'one') { audio.currentTime = 0; void audio.play() } else next()
     }
 
     const handleWaiting = () => setBuffering(true)
@@ -68,7 +72,7 @@ export function PlayerBar() {
       audio.removeEventListener('playing', handlePlaying)
       audio.removeEventListener('canplay', handleCanPlay)
     }
-  }, [next, setCurrentTime, isDragging])
+  }, [next, setCurrentTime, isDragging, repeatMode])
 
   // Load a new track when it changes
   useEffect(() => {
@@ -92,7 +96,7 @@ export function PlayerBar() {
         console.error('Play failed:', err)
       })
     }
-  }, [currentTrack?.id, isPlaying, volume])
+  }, [currentTrack, isPlaying, volume])
 
   // Handle play/pause changes for the SAME track
   useEffect(() => {
@@ -105,7 +109,7 @@ export function PlayerBar() {
     } else {
       audio.pause()
     }
-  }, [isPlaying])
+  }, [isPlaying, currentTrack])
 
   // Handle volume
   useEffect(() => {
@@ -154,7 +158,7 @@ export function PlayerBar() {
   const handleLike = useCallback(async () => {
     if (!currentTrack) return
     if (!user) {
-      requestAuth()
+      requestAuth({ type: 'playlist', track: currentTrack })
       return
     }
 
@@ -165,14 +169,12 @@ export function PlayerBar() {
       if (isLiked) {
         await fetch(`/api/likes?trackId=${encodeURIComponent(currentTrack.id)}`, {
           method: 'DELETE',
-          headers: { 'x-username': user.username },
         })
       } else {
         await fetch('/api/likes', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-username': user.username,
           },
           body: JSON.stringify({
             trackId: currentTrack.id,
@@ -184,11 +186,12 @@ export function PlayerBar() {
             duration: currentTrack.duration,
           }),
         })
+        openPlaylist(currentTrack)
       }
     } catch {
       toggleLike(currentTrack.id)
     }
-  }, [user, currentTrack, likedTrackIds, toggleLike, requestAuth])
+  }, [user, currentTrack, likedTrackIds, toggleLike, requestAuth, openPlaylist])
 
   const formatTime = (seconds: number) => {
     if (!seconds || seconds <= 0) return '0:00'
@@ -249,8 +252,8 @@ export function PlayerBar() {
           {/* Controls row */}
           <div className="flex items-center justify-between gap-4">
             {/* Track info */}
-            <div className="flex items-center gap-3 min-w-0 w-1/3">
-              <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-[42%] sm:w-1/3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
                 {currentTrack.coverUrl ? (
                   <img src={currentTrack.coverUrl} alt={currentTrack.album} className="w-full h-full object-cover" />
                 ) : (
@@ -300,7 +303,7 @@ export function PlayerBar() {
                   <SkipForward className="w-4 h-4 fill-current" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
                 <span>{formatTime(displayTime)}</span>
                 <span>/</span>
                 <span>{formatTime(duration)}</span>
@@ -308,7 +311,10 @@ export function PlayerBar() {
             </div>
 
             {/* Right controls */}
-            <div className="flex items-center gap-2 w-1/3 justify-end">
+            <div className="flex items-center gap-0 sm:gap-2 w-auto sm:w-1/3 justify-end">
+              <Button variant="ghost" size="icon" title={`Repeat: ${repeatMode}`} className={`h-8 w-8 cursor-pointer relative ${repeatMode !== 'off' ? 'text-primary' : 'text-muted-foreground'}`} onClick={cycleRepeat}>
+                <Repeat2 className="w-4 h-4" />{repeatMode === 'one' && <span className="absolute text-[8px] font-bold">1</span>}
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -320,7 +326,7 @@ export function PlayerBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
               >
                 {volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}

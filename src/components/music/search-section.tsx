@@ -9,18 +9,22 @@ import { AlbumGrid } from './album-grid'
 import { Search, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Track } from '@/stores/player-store'
+import type { SaavnArtist } from './artist-grid'
+import type { SaavnAlbum } from './album-grid'
 
 export function SearchSection() {
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'track' | 'artist' | 'album'>('track')
   const [tracks, setTracks] = useState<Track[]>([])
-  const [artists, setArtists] = useState<Record<string, unknown>[]>([])
-  const [albums, setAlbums] = useState<Record<string, unknown>[]>([])
+  const [artists, setArtists] = useState<SaavnArtist[]>([])
+  const [albums, setAlbums] = useState<SaavnAlbum[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const performSearch = useCallback(async (searchQuery: string, searchType: string) => {
+  const performSearch = useCallback(async (searchQuery: string, searchType: string, nextPage = 0, append = false) => {
     if (!searchQuery.trim()) {
       setSearched(false)
       return
@@ -30,15 +34,18 @@ export function SearchSection() {
     setSearched(true)
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}`)
+      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}&page=${nextPage}`)
       const data = await res.json()
+      setPage(nextPage)
+      setHasMore(Boolean(data.hasMore))
 
       if (searchType === 'track') {
-        setTracks((data.data || []).map(parseSaavnTrack))
+        const parsed = (data.data || []).map(parseSaavnTrack)
+        setTracks(prev => append ? [...prev, ...parsed] : parsed)
       } else if (searchType === 'artist') {
-        setArtists(data.data || [])
+        setArtists(prev => append ? [...prev, ...(data.data as SaavnArtist[] || [])] : (data.data as SaavnArtist[] || []))
       } else if (searchType === 'album') {
-        setAlbums(data.data || [])
+        setAlbums(prev => append ? [...prev, ...(data.data as SaavnAlbum[] || [])] : (data.data as SaavnAlbum[] || []))
       }
     } catch (error) {
       console.error('Search failed:', error)
@@ -131,6 +138,7 @@ export function SearchSection() {
           </div>
         )}
       </div>
+      {searched && !loading && hasMore && <div className="flex justify-center pt-2"><Button variant="secondary" onClick={() => performSearch(query, type, page + 1, true)}>Load more results</Button></div>}
     </div>
   )
 }
