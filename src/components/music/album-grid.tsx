@@ -3,10 +3,13 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { TrackList, parseSaavnTrack } from './track-list'
-import { ChevronLeft, Disc3 } from 'lucide-react'
+import { ChevronLeft, Disc3, ListPlus, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import type { Track } from '@/stores/player-store'
+import { useAuthStore } from '@/stores/auth-store'
+import { usePlayerStore } from '@/stores/player-store'
+import { usePlaylistDialogStore } from '@/stores/playlist-store'
 
 export interface SaavnAlbum {
   id: string
@@ -43,6 +46,20 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
   const [selectedAlbum, setSelectedAlbum] = useState<SaavnAlbum | null>(null)
   const [albumTracks, setAlbumTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(false)
+  const user = useAuthStore(state => state.user)
+  const requestAuth = useAuthStore(state => state.requestAuth)
+  const setQueue = usePlayerStore(state => state.setQueue)
+  const openAlbumDialog = usePlaylistDialogStore(state => state.openForTracks)
+  const playableAlbumTracks = albumTracks.filter(track => track.previewUrl)
+
+  const addAlbumToPlaylist = () => {
+    if (playableAlbumTracks.length === 0) return
+    if (!user) {
+      requestAuth({ type: 'playlist', track: playableAlbumTracks[0], queue: playableAlbumTracks })
+      return
+    }
+    openAlbumDialog(playableAlbumTracks)
+  }
 
   const handleSelectAlbum = async (album: SaavnAlbum) => {
     setSelectedAlbum(album)
@@ -74,7 +91,7 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
           Back to albums
         </Button>
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="w-24 h-24 rounded-lg overflow-hidden bg-secondary flex-shrink-0 shadow-xl">
             {coverUrl ? (
               <img src={coverUrl} alt={selectedAlbum.name} className="w-full h-full object-cover" />
@@ -84,7 +101,7 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
               </div>
             )}
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-muted-foreground mb-1">Album</p>
             <h2 className="text-2xl font-bold">{selectedAlbum.name}</h2>
             <p className="text-sm text-muted-foreground">
@@ -93,6 +110,16 @@ export function AlbumGrid({ albums }: AlbumGridProps) {
               {selectedAlbum.year ? ` · ${selectedAlbum.year}` : ''}
             </p>
           </div>
+          {!loading && playableAlbumTracks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setQueue(playableAlbumTracks)}>
+                <Play className="mr-2 h-4 w-4 fill-current" />Play album
+              </Button>
+              <Button onClick={addAlbumToPlaylist}>
+                <ListPlus className="mr-2 h-4 w-4" />Add album to playlist
+              </Button>
+            </div>
+          )}
         </div>
 
         {loading ? (

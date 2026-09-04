@@ -59,7 +59,9 @@ export function AuthModal() {
         if (pending.queue) usePlayerStore.getState().setQueue(pending.queue, Math.max(0, pending.queue.findIndex(t => t.id === pending.track.id)))
         else usePlayerStore.getState().playTrack(pending.track)
       } else if (pending?.type === 'playlist') {
-        usePlaylistDialogStore.getState().openForTrack(pending.track)
+        const playlistDialog = usePlaylistDialogStore.getState()
+        if (pending.queue && pending.queue.length > 1) playlistDialog.openForTracks(pending.queue)
+        else playlistDialog.openForTrack(pending.track)
       }
     } catch (err) {
       if (err instanceof Error && err.message === 'ADMIN_PASSWORD_REQUIRED') {

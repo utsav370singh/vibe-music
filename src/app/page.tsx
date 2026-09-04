@@ -4,12 +4,11 @@ import { useState, useEffect } from 'react'
 import { AuthModal } from '@/components/music/auth-modal'
 import { PlayerBar } from '@/components/music/player-bar'
 import { SearchSection } from '@/components/music/search-section'
-import { LikedSongs } from '@/components/music/liked-songs'
 import { HomePage } from '@/components/music/home-page'
 import { useAuthStore } from '@/stores/auth-store'
 import { usePlayerStore } from '@/stores/player-store'
 import { Button } from '@/components/ui/button'
-import { Heart, Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react'
+import { Home, LogOut, LogIn, Menu, X, Search } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
@@ -20,7 +19,7 @@ import { ListMusic, Shield } from 'lucide-react'
 
 export default function MusicPage() {
   const { user, logout, requestAuth, validateSession } = useAuthStore()
-  const [view, setView] = useState<'home' | 'search' | 'liked' | 'playlists' | 'admin'>('home')
+  const [view, setView] = useState<'home' | 'search' | 'playlists' | 'admin'>('home')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { setLikedTrackIds, clearQueue } = usePlayerStore()
   const { toast } = useToast()
@@ -160,15 +159,6 @@ export default function MusicPage() {
               <Search className="w-4 h-4" />
               Search
             </button>
-            <button
-              onClick={() => { setView('liked'); setSidebarOpen(false) }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                view === 'liked' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-              }`}
-            >
-              <Heart className="w-4 h-4" />
-              My Playlist
-            </button>
             <button onClick={() => { setView('playlists'); setSidebarOpen(false) }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${view === 'playlists' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'}`}>
               <ListMusic className="w-4 h-4" />Playlists
             </button>
@@ -230,7 +220,6 @@ export default function MusicPage() {
                   <SearchSection />
                 </div>
               )}
-              {view === 'liked' && <LikedSongs />}
               {view === 'playlists' && <PlaylistLibrary />}
               {view === 'admin' && user?.isAdmin && <AdminDashboard />}
             </motion.div>
