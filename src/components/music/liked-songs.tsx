@@ -27,6 +27,7 @@ export function LikedSongs() {
         coverUrl: String(s.coverUrl || ''),
         previewUrl: String(s.previewUrl),
         duration: Number(s.duration) || 0,
+        source: s.source === 'podcast' ? 'podcast' : 'saavn',
       })))
       setLikedTrackIds(data.map((s: Record<string, unknown>) => String(s.trackId)))
     } catch (error) {

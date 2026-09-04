@@ -99,7 +99,7 @@ export function PlayerBar() {
     previousTrackIdRef.current = currentTrack.id
 
     // Build the stream proxy URL from the Saavn download URL
-    const streamUrl = getStreamUrl(currentTrack.previewUrl)
+    const streamUrl = getStreamUrl(currentTrack)
     if (!streamUrl) return
 
     audio.src = streamUrl

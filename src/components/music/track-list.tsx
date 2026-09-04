@@ -38,14 +38,16 @@ export function parseSaavnTrack(raw: Record<string, unknown>): Track {
     coverUrl: cover?.link || '',
     previewUrl: dl320?.link || '',
     duration: parseInt(String(raw.duration || '0')) || 0,
+    source: 'saavn',
   }
 }
 
 // Build the proxy stream URL from a Saavn download URL
-export function getStreamUrl(saavnUrl: string): string {
-  if (!saavnUrl) return ''
+export function getStreamUrl(track: Pick<Track, 'previewUrl' | 'source'>): string {
+  if (!track.previewUrl) return ''
+  if (track.source === 'podcast') return track.previewUrl
   // Use btoa (browser-native) + base64url encoding
-  const encoded = btoa(saavnUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const encoded = btoa(track.previewUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   return `/api/stream?url=${encoded}`
 }
 

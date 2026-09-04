@@ -40,6 +40,7 @@ model LikedSong {
   coverUrl   String
   previewUrl String
   duration   Int
+  source     String?
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -71,6 +72,7 @@ model PlaylistSong {
   coverUrl   String
   previewUrl String
   duration   Int
+  source     String?
   createdAt  DateTime @default(now())
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 

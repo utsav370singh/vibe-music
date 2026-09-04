@@ -17,9 +17,10 @@ export async function requireAdmin() {
 }
 
 export function trackData(body: Record<string, unknown>) {
+  const source = body.source === 'podcast' ? 'podcast' : 'saavn'
   return {
     trackId: String(body.trackId || ''), title: String(body.title || ''), artist: String(body.artist || 'Unknown'),
     album: String(body.album || 'Unknown'), coverUrl: String(body.coverUrl || ''), previewUrl: String(body.previewUrl || ''),
-    duration: Number(body.duration) || 0,
+    duration: Number(body.duration) || 0, source,
   }
 }

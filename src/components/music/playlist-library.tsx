@@ -32,6 +32,7 @@ const toLikedTrack = (song: Record<string, unknown>): Track => ({
   coverUrl: String(song.coverUrl || ''),
   previewUrl: String(song.previewUrl || ''),
   duration: Number(song.duration) || 0,
+  source: song.source === 'podcast' ? 'podcast' : 'saavn',
 })
 
 export function PlaylistLibrary() {

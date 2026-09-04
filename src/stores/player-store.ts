@@ -8,6 +8,7 @@ export interface Track {
   coverUrl: string
   previewUrl: string
   duration: number
+  source?: 'saavn' | 'podcast'
 }
 
 interface PlayerState {

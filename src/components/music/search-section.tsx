@@ -6,7 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TrackList, parseSaavnTrack } from './track-list'
 import { ArtistGrid } from './artist-grid'
 import { AlbumGrid } from './album-grid'
-import { Search, Loader2, X } from 'lucide-react'
+import { PodcastGrid, type PodcastSummary } from './podcast-grid'
+import { Search, Loader2, X, Mic2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Track } from '@/stores/player-store'
 import type { SaavnArtist } from './artist-grid'
@@ -17,21 +18,25 @@ function appendUniqueById<T extends { id: string }>(current: T[], incoming: T[])
   return [...current, ...incoming.filter(item => item.id && !knownIds.has(item.id))]
 }
 
+type SearchType = 'track' | 'artist' | 'album' | 'podcast'
+
 export function SearchSection() {
   const [query, setQuery] = useState('')
-  const [type, setType] = useState<'track' | 'artist' | 'album'>('track')
+  const [type, setType] = useState<SearchType>('track')
   const [tracks, setTracks] = useState<Track[]>([])
   const [artists, setArtists] = useState<SaavnArtist[]>([])
   const [albums, setAlbums] = useState<SaavnAlbum[]>([])
+  const [podcasts, setPodcasts] = useState<PodcastSummary[]>([])
   const [initialLoading, setInitialLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [searched, setSearched] = useState(false)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [error, setError] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const requestIdRef = useRef(0)
 
-  const performSearch = useCallback(async (searchQuery: string, searchType: string, nextPage = 0, append = false) => {
+  const performSearch = useCallback(async (searchQuery: string, searchType: SearchType, nextPage = 0, append = false) => {
     if (!searchQuery.trim()) {
       setSearched(false)
       return
@@ -45,13 +50,22 @@ export function SearchSection() {
       setTracks([])
       setArtists([])
       setAlbums([])
+      setPodcasts([])
     }
+    setError('')
     setSearched(true)
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}&page=${nextPage}`)
+      const endpoint = searchType === 'podcast' ? '/api/search/podcasts' : '/api/search'
+      const typeParam = searchType === 'podcast' ? '' : `&type=${searchType}`
+      const res = await fetch(`${endpoint}?q=${encodeURIComponent(searchQuery)}${typeParam}&page=${nextPage}`)
       const data = await res.json()
       if (requestId !== requestIdRef.current) return
+      if (!res.ok) {
+        setError(data.error || 'Search is temporarily unavailable')
+        setHasMore(false)
+        return
+      }
       setPage(nextPage)
       setHasMore(Boolean(data.hasMore))
 
@@ -64,6 +78,8 @@ export function SearchSection() {
       } else if (searchType === 'album') {
         const incoming = (data.data as SaavnAlbum[] | undefined) || []
         setAlbums(prev => append ? appendUniqueById(prev, incoming) : incoming)
+      } else if (searchType === 'podcast') {
+        setPodcasts((data.data as PodcastSummary[] | undefined) || [])
       }
     } catch (error) {
       console.error('Search failed:', error)
@@ -84,9 +100,10 @@ export function SearchSection() {
   }
 
   const handleTypeChange = (newType: string) => {
-    setType(newType as 'track' | 'artist' | 'album')
+    const nextType = newType as SearchType
+    setType(nextType)
     if (query.trim()) {
-      performSearch(query, newType)
+      performSearch(query, nextType)
     }
   }
 
@@ -96,6 +113,8 @@ export function SearchSection() {
     setTracks([])
     setArtists([])
     setAlbums([])
+    setPodcasts([])
+    setError('')
     setSearched(false)
     setInitialLoading(false)
     setLoadingMore(false)
@@ -133,26 +152,34 @@ export function SearchSection() {
 
       {/* Type tabs */}
       <Tabs value={type} onValueChange={handleTypeChange}>
-        <TabsList className="bg-secondary">
+        <TabsList className="h-auto max-w-full flex-wrap justify-start bg-secondary">
           <TabsTrigger value="track" className="cursor-pointer">Songs</TabsTrigger>
           <TabsTrigger value="artist" className="cursor-pointer">Artists</TabsTrigger>
           <TabsTrigger value="album" className="cursor-pointer">Albums</TabsTrigger>
+          <TabsTrigger value="podcast" className="cursor-pointer"><Mic2 className="mr-1 h-3.5 w-3.5" />Podcasts</TabsTrigger>
         </TabsList>
       </Tabs>
 
       {/* Results */}
       <div className="min-h-[300px]">
+        {searched && !initialLoading && !error && type === 'podcast' && (
+          <p className="mb-3 text-xs text-muted-foreground">Podcast discovery by Podcast Index; audio is delivered by each publisher.</p>
+        )}
         {initialLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : error ? (
+          <div className="rounded-xl bg-destructive/10 px-4 py-10 text-center text-sm text-destructive">{error}</div>
         ) : searched ? (
           type === 'track' ? (
             <TrackList tracks={tracks} showIndex />
           ) : type === 'artist' ? (
             <ArtistGrid artists={artists} />
-          ) : (
+          ) : type === 'album' ? (
             <AlbumGrid albums={albums} />
+          ) : (
+            <PodcastGrid podcasts={podcasts} />
           )
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

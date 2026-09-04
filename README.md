@@ -22,6 +22,8 @@ For a production check, run `npm run build` and then `npm start`.
 
 The app uses MongoDB Atlas through `DATABASE_URL`. Live values belong in `.env.local`, which is ignored by Git. The tracked `.env` contains safe local placeholders only. Set `ADMIN_USERNAME` and a strong `ADMIN_PASSWORD` in `.env.local` before deployment.
 
+Podcast discovery requires free Podcast Index credentials in `PODCAST_INDEX_KEY` and `PODCAST_INDEX_SECRET`. Add the same variables to Vercel before deploying podcast search.
+
 The Admin navigation is hidden for every ordinary user. Signing in or signing up with `ADMIN_USERNAME` triggers an additional password challenge. Only that verified session can see the dashboard or call its APIs.
 
 Authentication for ordinary users is intentionally username-only, matching the product brief. A successful login creates a secure HTTP-only device cookie lasting 180 days, so the username is not requested repeatedly. For a public production service, add passwords or one-time codes for every account before treating usernames as secure identities.
@@ -32,5 +34,6 @@ Authentication for ordinary users is intentionally username-only, matching the p
 - Pressing a heart while signed out opens login. After login, the playlist chooser opens automatically.
 - A heart saves the song to Liked Songs and opens the chooser for any custom playlist.
 - Artist songs and search results support incremental pagination. Albums load their canonical full track list.
+- Podcast Index adds publisher-distributed podcast episodes without changing the existing JioSaavn music catalog.
 - Playlists can be shared with another registered username. Recipients see them under **Shared with you**.
 - The repeat button cycles off > repeat queue > repeat one.
